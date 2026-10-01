@@ -4,7 +4,7 @@ import SwiftUI
 struct PlantLifeApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            PlantLifeHome()
         }
     }
 }
