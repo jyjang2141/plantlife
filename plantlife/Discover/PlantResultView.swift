@@ -1,3 +1,10 @@
+//
+//  PlantResultView.swift
+//  plantlife
+//
+//  The fact cards (fun fact, needs, dangers) for an identified plant.
+//
+
 import SwiftUI
 
 /// Shows what the AI found: the plant's name up top, then facts in small cards.

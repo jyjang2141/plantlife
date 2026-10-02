@@ -2,12 +2,10 @@
 //  LearnView.swift
 //  plantlife
 //
+//  The Learn tab: what plants need to grow.
 //
 
-
 import SwiftUI
-
-// Unchanged from the version you pasted in.
 
 struct LearnView: View {
     var body: some View {

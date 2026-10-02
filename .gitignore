@@ -7,3 +7,4 @@ build/
 Pods/
 .swiftpm/
 plantlife/secret.swift
+Secret.swift

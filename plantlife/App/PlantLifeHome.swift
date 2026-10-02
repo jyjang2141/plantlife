@@ -2,25 +2,29 @@
 //  PlantLifeHome.swift
 //  plantlife
 //
+//  The tab bar: Garden, Discover, Journal, Learn.
 //
 
-
 import SwiftUI
+import SwiftData
 
 struct PlantLifeHome: View {
-    @State private var selectedTab = 0
+    @State private var selectedTab = 1   // open on Discover
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            GardenRescueView()
+            GardenView(selectedTab: $selectedTab)
                 .tabItem { Label("Garden", systemImage: "leaf.fill") }
                 .tag(0)
             DiscoverView(selectedTab: $selectedTab)
                 .tabItem { Label("Discover", systemImage: "camera.fill") }
                 .tag(1)
+            JournalView(selectedTab: $selectedTab)
+                .tabItem { Label("Journal", systemImage: "list.bullet.clipboard.fill") }
+                .tag(2)
             LearnView()
                 .tabItem { Label("Learn", systemImage: "book.fill") }
-                .tag(2)
+                .tag(3)
         }
         .tint(.green)
     }
@@ -28,4 +32,5 @@ struct PlantLifeHome: View {
 
 #Preview {
     PlantLifeHome()
+        .modelContainer(for: [JournalEntry.self, GardenPlant.self], inMemory: true)
 }

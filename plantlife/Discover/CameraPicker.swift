@@ -1,3 +1,10 @@
+//
+//  CameraPicker.swift
+//  plantlife
+//
+//  Opens the iPhone camera so the Discover tab can take a photo.
+//
+
 import SwiftUI
 import UIKit
 

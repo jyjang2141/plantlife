@@ -1,10 +1,17 @@
+//
+//  PlantIdentifier.swift
+//  plantlife
+//
+//  Sends a photo to Gemini and gets back facts about the plant.
+//
+
 import UIKit
 
 // MARK: - Result model
 
 /// What the AI sends back about a photo. Every field except `isPlant` is optional
-/// so a "that's not a plant" answer still decodes cleanly.
-struct PlantInfo: Decodable, Equatable {
+/// so a "that's not a plant" answer still decodes cleanly. Codable so the Journal can save it.
+nonisolated struct PlantInfo: Codable, Equatable {
     let isPlant: Bool
     let commonName: String?
     let scientificName: String?
@@ -16,6 +23,7 @@ struct PlantInfo: Decodable, Equatable {
     let dangers: [String]?
     let safetyNote: String?
     let message: String?           // only used when isPlant == false
+    let gardenPlot: String?        // "desert", "sunny", or "shady"
 
     enum CodingKeys: String, CodingKey {
         case isPlant = "is_plant"
@@ -29,10 +37,11 @@ struct PlantInfo: Decodable, Equatable {
         case dangers
         case safetyNote = "safety_note"
         case message
+        case gardenPlot = "garden_plot"
     }
 }
 
-struct PlantNeeds: Decodable, Equatable {
+nonisolated struct PlantNeeds: Codable, Equatable {
     let sunlight: String?
     let water: String?
     let soil: String?
@@ -228,14 +237,21 @@ struct PlantIdentifier {
             "needs": needs,
             "dangers": dangers,
             "safety_note": prop("string", "Only if the plant is poisonous, prickly, or irritating. Otherwise an empty string."),
-            "message": prop("string", "Only when is_plant is false: a friendly sentence asking for another photo. Otherwise an empty string.")
+            "message": prop("string", "Only when is_plant is false: a friendly sentence asking for another photo. Otherwise an empty string."),
+            "garden_plot": [
+                "type": "string",
+                "enum": ["desert", "sunny", "shady"],
+                "description": "Which garden bed fits this plant's needs best. 'desert': needs little water and lots of sun "
+                    + "(cacti, succulents, drought-tolerant plants). 'sunny': wants full sun and regular water. "
+                    + "'shady': prefers shade, partial shade, or indirect light."
+            ]
         ]
 
         return [
             "type": "object",
             "properties": properties,
             "required": ["is_plant", "common_name", "scientific_name", "confidence", "summary",
-                         "fun_fact", "where_it_grows", "needs", "dangers", "safety_note", "message"]
+                         "fun_fact", "where_it_grows", "needs", "dangers", "safety_note", "message", "garden_plot"]
         ]
     }
 }

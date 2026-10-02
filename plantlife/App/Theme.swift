@@ -2,13 +2,11 @@
 //  Theme.swift
 //  plantlife
 //
+//  The app's shared colors and card style.
 //
-
 
 import SwiftUI
 
-// Pulled out into its own file so it stays available to plantResult.swift
-// regardless of which top-level UI is currently in use.
 enum Theme {
     static let leaf  = Color(red: 0.15, green: 0.47, blue: 0.25)
     static let sun   = Color(red: 0.80, green: 0.55, blue: 0.05)
