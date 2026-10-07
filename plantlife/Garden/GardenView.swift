@@ -135,7 +135,7 @@ struct GardenView: View {
                         .offset(y: -43)
                     if bedUnderHose != nil {
                         WaterDrips()
-                            .offset(x: 18, y: 43)
+                            .offset(x: 4, y: 43)
                     }
                 }
                 .frame(width: 112, height: 175)
@@ -175,7 +175,7 @@ struct GardenView: View {
                 hosePosition = clamped(origin.moved(by: value.translation), in: size)
 
                 // Where the water drops land, just below the shower head.
-                let dropPoint = CGPoint(x: hosePosition.x + 18, y: hosePosition.y + 80)
+                let dropPoint = CGPoint(x: hosePosition.x + 4, y: hosePosition.y + 80)
                 let bed = bedFrames.first { $0.value.contains(dropPoint) }?.key
                 bedUnderHose = bed
 
@@ -279,17 +279,27 @@ private struct GardenBed: View {
                 } else {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 78), spacing: 6)], spacing: 6) {
                         ForEach(plants) { plant in
-                            Button {
-                                onSelect(plant)
-                            } label: {
-                                PlantInBed(plant: plant, thirsty: plant.isThirsty(at: now), textColor: bed.textOnSoil)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .contextMenu {
-                                Button("Remove from garden", systemImage: "trash", role: .destructive) {
-                                    onRemove(plant)
+                            let thirsty = plant.isThirsty(at: now)
+                            VStack(spacing: 6) {
+                                Button {
+                                    onSelect(plant)
+                                } label: {
+                                    PlantInBed(plant: plant, thirsty: thirsty, textColor: bed.textOnSoil)
+                                        .contentShape(Rectangle())
                                 }
+                                .buttonStyle(.plain)
+                                .contextMenu {
+                                    Button("Remove from garden", systemImage: "trash", role: .destructive) {
+                                        onRemove(plant)
+                                    }
+                                }
+
+                                // Always laid out so tiles don't jump when it appears.
+                                ProgressView(value: progress)
+                                    .tint(.blue)
+                                    .frame(width: 56)
+                                    .opacity(isUnderHose && thirsty ? 1 : 0)
+                                    .accessibilityHidden(true)
                             }
                         }
                     }
@@ -297,14 +307,6 @@ private struct GardenBed: View {
                 }
             }
             .frame(minHeight: plants.isEmpty ? 70 : 120)
-            .overlay(alignment: .bottom) {
-                if isUnderHose && isDry {
-                    ProgressView(value: progress)
-                        .tint(.blue)
-                        .padding(.horizontal, 14)
-                        .padding(.bottom, 8)
-                }
-            }
             .animation(.easeInOut(duration: 0.5), value: isDry)
         }
         .padding(12)
