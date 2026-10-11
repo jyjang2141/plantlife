@@ -17,6 +17,7 @@ struct JournalView: View {
     @Query(sort: \JournalEntry.dateFound, order: .reverse) private var entries: [JournalEntry]
     @State private var searchText = ""
     @State private var favoritesOnly = false
+    @State private var showComparison = false
 
     private var filtered: [JournalEntry] {
         entries.filter { entry in
@@ -39,6 +40,17 @@ struct JournalView: View {
                     }
                 } else {
                     List {
+                        if entries.count > 5 {
+                            Section {
+                                Button {
+                                    showComparison = true
+                                } label: {
+                                    Label("Wonder about your plants", systemImage: "bubble.left.and.bubble.right")
+                                }
+                            } footer: {
+                                Text("An optional question to explore together.")
+                            }
+                        }
                         Section {
                             ForEach(filtered) { entry in
                                 NavigationLink {
@@ -75,11 +87,75 @@ struct JournalView: View {
                 }
             }
             .navigationTitle("My Journal")
+            .sheet(isPresented: $showComparison) {
+                JournalComparisonView(entries: entries)
+            }
         }
     }
 
     private func delete(at offsets: IndexSet) {
         for index in offsets { context.delete(filtered[index]) }
+    }
+}
+
+private struct JournalComparisonView: View {
+    let entries: [JournalEntry]
+    @Environment(\.dismiss) private var dismiss
+    @AppStorage("journal.nextComparisonPrompt") private var nextPrompt = 0
+    @AppStorage("journal.comparisonAnswers") private var savedAnswers = "{}"
+    @State private var promptIndex = 0
+    @State private var firstPlant = 0
+    @State private var secondPlant = 1
+    @State private var answer = ""
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text(JournalPrompts.comparisons[promptIndex]).font(.title2.bold())
+                    Text("Choose plants from your journal and look for clues.")
+                        .foregroundStyle(.secondary)
+                    Picker("First plant", selection: $firstPlant) {
+                        ForEach(entries.indices, id: \.self) { index in
+                            Text(entries[index].name).tag(index)
+                        }
+                    }
+                    Picker("Second plant", selection: $secondPlant) {
+                        ForEach(entries.indices, id: \.self) { index in
+                            Text(entries[index].name).tag(index)
+                        }
+                    }
+                    HStack {
+                        JournalRow(entry: entries[firstPlant])
+                        JournalRow(entry: entries[secondPlant])
+                    }
+                    TextField("What do you notice?", text: $answer, axis: .vertical)
+                        .lineLimit(3...8).textFieldStyle(.roundedBorder)
+                    Button("Save my thoughts") {
+                        var answers = (try? JSONDecoder().decode([String: String].self, from: Data(savedAnswers.utf8))) ?? [:]
+                        answers[String(promptIndex)] = answer
+                        if let data = try? JSONEncoder().encode(answers), let string = String(data: data, encoding: .utf8) {
+                            savedAnswers = string
+                        }
+                        nextPrompt = (promptIndex + 1) % JournalPrompts.comparisons.count
+                        dismiss()
+                    }
+                    .buttonStyle(.borderedProminent).disabled(answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Button("Skip for now") {
+                        nextPrompt = (promptIndex + 1) % JournalPrompts.comparisons.count
+                        dismiss()
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("Plant wonders")
+            .toolbar { Button("Close") { dismiss() } }
+            .onAppear {
+                promptIndex = nextPrompt % JournalPrompts.comparisons.count
+                let answers = (try? JSONDecoder().decode([String: String].self, from: Data(savedAnswers.utf8))) ?? [:]
+                answer = answers[String(promptIndex)] ?? ""
+            }
+        }
     }
 }
 

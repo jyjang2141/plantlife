@@ -17,6 +17,13 @@ final class JournalEntry {
     var dateFound: Date
     var notes: String
     var isFavorite: Bool
+    var observationPromptIndex: Int = -1
+    var observationAnswer: String = ""
+    var observationSkipped: Bool = false
+    var plantTypeAnswer: String = ""
+    var plantSizeAnswer: String = ""
+    var plantAppearanceAnswer: String = ""
+    var plantLocationAnswer: String = ""
     @Attribute(.externalStorage) var photoData: Data?
     /// The full AI answer (fun fact, needs, dangers...) saved as JSON.
     var infoData: Data
