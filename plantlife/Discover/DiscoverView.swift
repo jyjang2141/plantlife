@@ -9,19 +9,18 @@ import SwiftUI
 import SwiftData
 import PhotosUI
 
-// MARK: - Discover: scan one plant at a time
-// No swiping. The screen shows your most recent find; every scan is
-// saved to the Journal and planted in the Garden automatically.
+// MARK: - Discover: add a new plant
+// Every scan is saved to the Journal and planted in the Garden, then the
+// kid is sent straight to its Journal page to observe it before the reveal.
 
 struct DiscoverView: View {
     @Binding var selectedTab: Int
+    @Binding var journalPath: [JournalEntry]
 
     @Environment(\.modelContext) private var context
-    @Query(sort: \JournalEntry.dateFound, order: .reverse) private var entries: [JournalEntry]
 
     @State private var isLoading = false
     @State private var errorMessage: String?
-    @State private var justSaved = false
 
     @State private var showCamera = false
     @State private var photoItem: PhotosPickerItem?
@@ -33,17 +32,7 @@ struct DiscoverView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
-                    Text("Take a photo of a plant to add it to your journal.")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-
-                    if let latest = entries.first {
-                        LatestFindCard(entry: latest)
-                            .padding(.horizontal, 18)
-                    } else {
-                        emptyState
-                    }
+                    addPlantCard
 
                     statusArea
 
@@ -65,8 +54,6 @@ struct DiscoverView: View {
                         .disabled(isLoading)
                     }
                     .padding(.horizontal)
-
-                    if justSaved { savedBanner }
                 }
                 .padding(.vertical)
             }
@@ -96,13 +83,13 @@ struct DiscoverView: View {
 
     // MARK: Pieces
 
-    private var emptyState: some View {
+    private var addPlantCard: some View {
         VStack(spacing: 14) {
             Text("🌱")
                 .font(.system(size: 80))
-            Text("No plants yet")
+            Text("Add a new plant")
                 .font(.title2.bold())
-            Text("Snap a photo of a real plant to start your journal!")
+            Text("Take a photo of a plant to add it to your journal.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -117,26 +104,6 @@ struct DiscoverView: View {
         .frame(maxWidth: .infinity)
         .background(Color.green.opacity(0.06), in: RoundedRectangle(cornerRadius: 28))
         .padding(.horizontal)
-    }
-
-    private var savedBanner: some View {
-        VStack(spacing: 10) {
-            Label("Saved to your Journal and planted in your Garden!", systemImage: "checkmark.circle.fill")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.green)
-                .multilineTextAlignment(.center)
-            HStack(spacing: 12) {
-                Button { selectedTab = 0 } label: {
-                    Label("Water it", systemImage: "drop.fill").frame(maxWidth: .infinity)
-                }
-                Button { selectedTab = 2 } label: {
-                    Label("Open Journal", systemImage: "list.bullet.clipboard.fill").frame(maxWidth: .infinity)
-                }
-            }
-            .buttonStyle(.bordered).tint(.green)
-        }
-        .padding(.horizontal)
-        .transition(.opacity.combined(with: .move(edge: .bottom)))
     }
 
     @ViewBuilder
@@ -166,13 +133,14 @@ struct DiscoverView: View {
     private func identify(_ image: UIImage) async {
         isLoading = true
         errorMessage = nil
-        justSaved = false
         do {
             let info = try await identifier.identify(image: image)
             isLoading = false
             if info.isPlant {
-                PlantRecorder.record(info: info, image: image, in: context)
-                withAnimation(.snappy) { justSaved = true }
+                let entry = PlantRecorder.record(info: info, image: image, in: context)
+                // Jump straight to the new plant's Journal page.
+                journalPath = [entry]
+                selectedTab = 2
             } else {
                 errorMessage = info.message?.isEmpty == false
                     ? info.message!
@@ -182,57 +150,5 @@ struct DiscoverView: View {
             isLoading = false
             errorMessage = error.localizedDescription
         }
-    }
-}
-
-// MARK: - The latest find (one card, no swiping)
-
-private struct LatestFindCard: View {
-    let entry: JournalEntry
-
-    var body: some View {
-        VStack(spacing: 16) {
-            ZStack(alignment: .bottom) {
-                Group {
-                    if let image = entry.image {
-                        Image(uiImage: image).resizable().scaledToFill()
-                    } else {
-                        Color.green.opacity(0.12)
-                    }
-                }
-                .frame(height: 235)
-                .frame(maxWidth: .infinity)
-                .clipped()
-
-                Text("Latest find")
-                    .font(.headline).foregroundStyle(.white)
-                    .padding(10).background(.black.opacity(0.25), in: Capsule())
-                    .padding(.bottom, 10)
-            }
-            .frame(height: 235)
-            .clipShape(RoundedRectangle(cornerRadius: 28))
-
-            Text(entry.name)
-                .font(.title.bold())
-                .multilineTextAlignment(.center)
-
-            if let summary = entry.info?.summary, !summary.isEmpty {
-                Text(summary)
-                    .font(.body)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
-            }
-
-            NavigationLink {
-                JournalEntryDetailView(entry: entry)
-            } label: {
-                Label("See full details", systemImage: "chevron.right.circle.fill")
-                    .font(.subheadline.weight(.semibold))
-            }
-            .tint(.green)
-        }
-        .padding(18)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: 28))
-        .shadow(color: .black.opacity(0.10), radius: 12, y: 5)
     }
 }

@@ -24,6 +24,8 @@ final class JournalEntry {
     var plantSizeAnswer: String = ""
     var plantAppearanceAnswer: String = ""
     var plantLocationAnswer: String = ""
+    /// True once the kid has answered the observation questions and seen the plant revealed.
+    var observationsCompleted: Bool = false
     @Attribute(.externalStorage) var photoData: Data?
     /// The full AI answer (fun fact, needs, dangers...) saved as JSON.
     var infoData: Data

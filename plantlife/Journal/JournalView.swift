@@ -12,6 +12,7 @@ import SwiftData
 
 struct JournalView: View {
     @Binding var selectedTab: Int
+    @Binding var path: [JournalEntry]
 
     @Environment(\.modelContext) private var context
     @Query(sort: \JournalEntry.dateFound, order: .reverse) private var entries: [JournalEntry]
@@ -22,12 +23,12 @@ struct JournalView: View {
     private var filtered: [JournalEntry] {
         entries.filter { entry in
             (!favoritesOnly || entry.isFavorite) &&
-            (searchText.isEmpty || entry.name.localizedCaseInsensitiveContains(searchText))
+            (searchText.isEmpty || (entry.observationsCompleted && entry.name.localizedCaseInsensitiveContains(searchText)))
         }
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             Group {
                 if entries.isEmpty {
                     ContentUnavailableView {
@@ -53,9 +54,7 @@ struct JournalView: View {
                         }
                         Section {
                             ForEach(filtered) { entry in
-                                NavigationLink {
-                                    JournalEntryDetailView(entry: entry)
-                                } label: {
+                                NavigationLink(value: entry) {
                                     JournalRow(entry: entry)
                                 }
                             }
@@ -87,6 +86,9 @@ struct JournalView: View {
                 }
             }
             .navigationTitle("My Journal")
+            .navigationDestination(for: JournalEntry.self) { entry in
+                JournalEntryDetailView(entry: entry)
+            }
             .sheet(isPresented: $showComparison) {
                 JournalComparisonView(entries: entries)
             }
@@ -179,12 +181,16 @@ private struct JournalRow: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    Text(entry.name).font(.headline)
+                    Text(entry.observationsCompleted ? entry.name : "Mystery plant").font(.headline)
                     if entry.isFavorite {
                         Image(systemName: "heart.fill").font(.caption).foregroundStyle(.pink)
                     }
                 }
-                if let scientific = entry.info?.scientificName, !scientific.isEmpty {
+                if !entry.observationsCompleted {
+                    Text("Answer the questions to reveal it!")
+                        .font(.subheadline)
+                        .foregroundStyle(.green)
+                } else if let scientific = entry.info?.scientificName, !scientific.isEmpty {
                     Text(scientific)
                         .font(.subheadline.italic())
                         .foregroundStyle(.secondary)

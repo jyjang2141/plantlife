@@ -10,16 +10,17 @@ import SwiftData
 
 struct PlantLifeHome: View {
     @State private var selectedTab = 1   // open on Discover
+    @State private var journalPath: [JournalEntry] = []
 
     var body: some View {
         TabView(selection: $selectedTab) {
             GardenView(selectedTab: $selectedTab)
                 .tabItem { Label("Garden", systemImage: "leaf.fill") }
                 .tag(0)
-            DiscoverView(selectedTab: $selectedTab)
+            DiscoverView(selectedTab: $selectedTab, journalPath: $journalPath)
                 .tabItem { Label("Discover", systemImage: "camera.fill") }
                 .tag(1)
-            JournalView(selectedTab: $selectedTab)
+            JournalView(selectedTab: $selectedTab, path: $journalPath)
                 .tabItem { Label("Journal", systemImage: "list.bullet.clipboard.fill") }
                 .tag(2)
             LearnView()
