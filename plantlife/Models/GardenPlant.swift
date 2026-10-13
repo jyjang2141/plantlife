@@ -52,6 +52,49 @@ enum GardenPlot: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    /// SF Symbol shown for this bed (replaces the emoji).
+    var symbol: String {
+        switch self {
+        case .desert: "sun.haze.fill"
+        case .sunny:  "sun.max.fill"
+        case .shady:  "tree.fill"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .desert: .orange
+        case .sunny:  .yellow
+        case .shady:  .green
+        }
+    }
+
+    /// Fixed conditions for each bed, shown on its card and at the top of the bed.
+    var sunlight: String {
+        switch self {
+        case .desert: "10h sun"
+        case .sunny:  "8h sun"
+        case .shady:  "3h sun"
+        }
+    }
+
+    var climate: String {
+        switch self {
+        case .desert: "Hot & dry"
+        case .sunny:  "Warm"
+        case .shady:  "Cool & damp"
+        }
+    }
+
+    /// e.g. "Water every 12h", worked out from the real thirst timer.
+    var wateringLabel: String {
+        let hours = Int((GardenPlant.baseThirstInterval * thirstMultiplier / 3600).rounded())
+        return "Water every \(hours)h"
+    }
+
+    /// How many plots each bed has (3 x 3).
+    static let plotCount = 9
+
     var needs: String {
         switch self {
         case .desert: "Lots of sun, a little water, sandy soil"

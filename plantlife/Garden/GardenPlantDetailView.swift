@@ -71,11 +71,11 @@ struct GardenPlantDetailView: View {
                 .background(thirsty ? plant.plot.drySoil : plant.plot.wetSoil,
                             in: RoundedRectangle(cornerRadius: 24))
 
-            Text("Lives in the \(plant.plot.emoji) \(plant.plot.title)")
+            Label("Lives in the \(plant.plot.title)", systemImage: plant.plot.symbol)
                 .font(.headline)
 
             if thirsty {
-                Label("Thirsty! Drag the 🚿 onto the \(plant.plot.title) to water it.", systemImage: "drop")
+                Label("Thirsty! Drag the watering can onto it in the \(plant.plot.title).", systemImage: "drop")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.orange)
                     .multilineTextAlignment(.center)
@@ -93,8 +93,8 @@ struct GardenPlantDetailView: View {
                 HStack(spacing: 0) {
                     ForEach(0...GardenPlant.maxGrowth, id: \.self) { stage in
                         VStack(spacing: 4) {
-                            Text(stage == 0 ? "🌱" : plant.kind.emoji)
-                                .font(.title2)
+                            PlantSprite(kind: plant.kind, growth: stage, droopy: false, size: 36)
+                                .frame(height: 40, alignment: .bottom)
                                 .opacity(stage <= plant.growth ? 1 : 0.25)
                             Text(["Seedling", "Sprout", "Growing", "Grown"][stage])
                                 .font(.caption2)
