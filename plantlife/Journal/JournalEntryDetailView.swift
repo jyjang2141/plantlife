@@ -46,6 +46,7 @@ struct JournalEntryDetailView: View {
                 question(JournalPrompts.observations[1], answer: $entry.plantSizeAnswer, hint: "Tiny, tall, or somewhere in between…")
                 question(JournalPrompts.observations[2], answer: $entry.plantAppearanceAnswer, hint: "I see these colors and shapes…")
                 question(JournalPrompts.observations[3], answer: $entry.plantLocationAnswer, hint: "I found it…")
+                terrainQuestion
                 Text("A few words are enough!")
                     .font(.footnote).foregroundStyle(.secondary)
                 Button {
@@ -56,6 +57,12 @@ struct JournalEntryDetailView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent).tint(Theme.leaf)
+                .disabled(entry.terrainGuess == nil)
+                if entry.terrainGuess == nil {
+                    Text("Pick a terrain to reveal your plant.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                }
             }
             .padding(20)
         }
@@ -69,6 +76,7 @@ struct JournalEntryDetailView: View {
                 Text("Found on " + entry.dateFound.formatted(date: .long, time: .shortened))
                     .font(.footnote).foregroundStyle(.secondary)
                 if let info = entry.info { PlantResultView(info: info) }
+                terrainFeedback
                 observationsCard
                 if !entry.observationAnswer.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
@@ -88,12 +96,13 @@ struct JournalEntryDetailView: View {
 
     /// The kid's answers from before the reveal, shown read-only.
     private var observationsCard: some View {
-        let answers = [entry.plantTypeAnswer, entry.plantSizeAnswer, entry.plantAppearanceAnswer, entry.plantLocationAnswer]
+        let answers = [entry.plantTypeAnswer, entry.plantSizeAnswer, entry.plantAppearanceAnswer, entry.plantLocationAnswer,
+                       entry.terrainGuess?.title ?? ""]
         return VStack(alignment: .leading, spacing: 14) {
             Label("My observations", systemImage: "magnifyingglass")
                 .font(.system(.headline, design: .rounded))
                 .foregroundStyle(Theme.leaf)
-            ForEach(Array(zip(JournalPrompts.observations, answers)), id: \.0) { prompt, answer in
+            ForEach(Array(zip(JournalPrompts.observations + [JournalPrompts.terrain], answers)), id: \.0) { prompt, answer in
                 VStack(alignment: .leading, spacing: 4) {
                     Text(prompt)
                         .font(.system(.subheadline, design: .rounded, weight: .semibold))
@@ -106,6 +115,91 @@ struct JournalEntryDetailView: View {
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.card).clipShape(Theme.cardShape)
+    }
+
+    // MARK: Terrain question
+
+    /// Multiple choice: one button per garden bed.
+    private var terrainQuestion: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(JournalPrompts.terrain).font(.system(.headline, design: .rounded))
+            ForEach(GardenPlot.allCases) { plot in
+                let selected = entry.terrainGuess == plot
+                Button {
+                    entry.terrainAnswer = plot.rawValue
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: plot.symbol)
+                            .font(.title2).foregroundStyle(plot.tint)
+                            .frame(width: 32)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(plot.title)
+                                .font(.system(.body, design: .rounded, weight: .semibold))
+                            Text(plot.needs)
+                                .font(.system(.footnote, design: .rounded))
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                            .font(.title3)
+                            .foregroundStyle(selected ? Theme.leaf : .secondary)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(selected ? Theme.leaf.opacity(0.12) : Color.clear,
+                                in: RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14)
+                        .stroke(selected ? Theme.leaf : Color.secondary.opacity(0.3), lineWidth: selected ? 2 : 1))
+                    .contentShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.card).clipShape(Theme.cardShape)
+    }
+
+    /// After the reveal: tells the kid if their terrain guess was right, and if not, why.
+    @ViewBuilder private var terrainFeedback: some View {
+        if let guess = entry.terrainGuess, let correct = entry.correctTerrain {
+            let isRight = guess == correct
+            VStack(alignment: .leading, spacing: 10) {
+                Label(isRight ? "You got the terrain right!" : "Not quite the right terrain",
+                      systemImage: isRight ? "checkmark.seal.fill" : "arrow.triangle.2.circlepath")
+                    .font(.system(.headline, design: .rounded))
+                    .foregroundStyle(isRight ? Theme.leaf : Theme.alert)
+                ForEach(terrainFeedbackLines(guess: guess, correct: correct), id: \.self) { line in
+                    Text(line).font(.system(.body, design: .rounded))
+                }
+                Label("\(entry.name) is growing in the \(correct.title) in your garden.", systemImage: correct.symbol)
+                    .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                    .foregroundStyle(correct.tint)
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.card).clipShape(Theme.cardShape)
+        }
+    }
+
+    private func terrainFeedbackLines(guess: GardenPlot, correct: GardenPlot) -> [String] {
+        let needs = entry.info?.needs
+        let plantNeeds = [needs?.sunlight, needs?.water].compactMap { $0?.isEmpty == false ? $0 : nil }
+        var lines: [String] = []
+        if guess == correct {
+            lines.append("You picked the \(correct.title). That's where \(entry.name) belongs!")
+        } else {
+            lines.append("You picked the \(guess.title). That bed is for plants that need \(guess.needs.lowercased()). "
+                         + "\(entry.name) needs something different.")
+        }
+        if !plantNeeds.isEmpty {
+            lines.append(plantNeeds.joined(separator: " "))
+        }
+        if guess != correct {
+            lines.append("That's why it grows best in the \(correct.title): \(correct.needs.lowercased()).")
+        }
+        return lines
     }
 
     @ViewBuilder private var photo: some View {

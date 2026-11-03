@@ -24,6 +24,8 @@ final class JournalEntry {
     var plantSizeAnswer: String = ""
     var plantAppearanceAnswer: String = ""
     var plantLocationAnswer: String = ""
+    /// The garden bed the kid guessed (a `GardenPlot` raw value), empty until they pick one.
+    var terrainAnswer: String = ""
     /// True once the kid has answered the observation questions and seen the plant revealed.
     var observationsCompleted: Bool = false
     @Attribute(.externalStorage) var photoData: Data?
@@ -41,4 +43,12 @@ final class JournalEntry {
 
     var info: PlantInfo? { try? JSONDecoder().decode(PlantInfo.self, from: infoData) }
     var image: UIImage? { photoData.flatMap(UIImage.init(data:)) }
+
+    var terrainGuess: GardenPlot? { GardenPlot(rawValue: terrainAnswer) }
+
+    /// The bed this plant really belongs in: the same rule PlantRecorder uses to plant it.
+    var correctTerrain: GardenPlot? {
+        guard let info else { return nil }
+        return GardenPlot.from(kind: PlantKind.from(info: info), info: info)
+    }
 }

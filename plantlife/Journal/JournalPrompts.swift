@@ -8,6 +8,8 @@ enum JournalPrompts {
         "Where did you find this plant?"
     ]
 
+    static let terrain = "What terrain do you think this plant grows in?"
+
     static let comparisons = [
         "What is the same about these two plants?",
         "What is different about these two plants?",
