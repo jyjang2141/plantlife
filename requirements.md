@@ -22,13 +22,17 @@ The questions the student will be asked are:
 All of the questions should be required except the last question. All questions are free text except the 5th question about terrains which should be a multiple choice reflecting the three terrains in the game. If the student answers incorrectly, they should be informed why their answer was wrong, and why the plant needs to be in a different terrain.
 
 ### Virtual Garden
-Once the plant is identified, it is added to the virtual garden. The app will automatically place it in the correct terrain after giving the student feedback on their response to the initial observation question about terrains. The student will be able to care for the plant over time and record observations of the plant growth in their journal. The virtual garden will be separated into three different terrains: desert bed, sunny bed, and shady corner. The plants will grow over time when cared for and require maintanence tasks like watering, pruning, and pest control. If they are not cared for, they should wilt and eventually die. The user will be able to move their plant within a specific terrain but it will not affect the amount of sunlight the plant receives. The timing of the care will be on a slighly expedited schedule, with a maximum of 24 hours between waterings and a minimum of 12 hours.
+Once the plant is identified, it is added to the virtual garden. The app will automatically place it in the correct terrain after giving the student feedback on their response to the initial observation question about terrains. The student will be able to care for the plant over time and record observations of the plant growth in their journal. The virtual garden will be separated into three different terrains: desert bed, sunny bed, and shady corner.
+
+The plants will grow over time when cared for and require maintanence tasks like watering, pruning, and pest control. If they are not cared for, they should wilt and eventually die. The user will be able to move their plant within a specific terrain but it will not affect the amount of sunlight the plant receives. The timing of the care will be on a slighly expedited schedule compared to real time. For example, watering will be expected to be done every 6-48 hours, depending on the type of plant. Watering frequencies should reflect the needs of the real plant. Gradual wilting should occur immediately after the missed watering. The plant should die if not cared for in 3 days (72 hours). The other events like pruning and pest control will happen at random occurrences. They will pop up as a mini game to address the specific need of the plant.
+
+When a plant dies, the plant will not be able to be revived. The student will journal about what went wrong with the care for that plant that led to its death before the plant is removed from the garden.
 
 ### Journal
 The journal will be available per plant and provides a space for the student to write about their observations. Each entry should be timestamped so the student will be able to see progress over time.
 
 ## Visual Design
-The app will be playful and engaging for a younger audience. Common plants will have a built-in icon that will display in the virtual garden. All other plants will resort to a default plant icon.
+The app will be playful and engaging for a younger audience. Common plants will have a built-in icon that will display in the virtual garden. There will be icons for the following plants at these stages: sprout, seedling, vegetating, budding, flowering, and ripening. Each plant will only have the stages that make sense for that type of plant. All other plants will resort to a default plant icon with the basic stages including sprout, seedling and vegetating.
 The following plants will have a built-in icon:
 * Plants
     * Daisy
@@ -58,4 +62,4 @@ The following plants will have a built-in icon:
     * Bush
 
 ## Data Storage
-The app will not store any information about location. Each user should have an account that stores the plants they have identified and are growing in their garden.
+The app will not store any GPS information nor will it track location. Each user should have an account that stores the plants they have identified and are growing in their garden.
