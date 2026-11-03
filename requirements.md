@@ -32,7 +32,14 @@ When a plant dies, the plant will not be able to be revived. The student will jo
 The journal will be available per plant and provides a space for the student to write about their observations. Each entry should be timestamped so the student will be able to see progress over time.
 
 ## Visual Design
-The app will be playful and engaging for a younger audience. Common plants will have a built-in icon that will display in the virtual garden. There will be icons for the following plants at these stages: sprout, seedling, vegetating, budding, flowering, and ripening. Each plant will only have the stages that make sense for that type of plant. All other plants will resort to a default plant icon with the basic stages including sprout, seedling and vegetating.
+The app will be playful and engaging for a younger audience. Common plants will have a built-in icon that will display in the virtual garden. There will be icons for the following plants at these stages: sprout, seedling, vegetating, budding, flowering, and ripening. Each plant will only have the stages that make sense for that type of plant. All other plants will resort to a default plant icon with the basic stages including sprout, seedling and vegetating. If the plant identification confirms the plant flowers, the default plant will also have budding and flowering stages, drawn in the flower color reported for the photographed plant.
+
+Flowering plants (rose, tulip, poppy, orchid, daisy, and default plants that flower) will be drawn in the flower color of the plant the student photographed, falling back to a classic color if the color is unknown.
+
+Trees will have a ripening stage showing their seeds: acorns (oak), helicopter seeds (maple), pinecones (pine), and coconuts (coconut palm). Only the maple will have a flowering stage.
+
+Wilting plants will be shown by drooping, tilting, and fading the plant's current icon. Dead plants will use one shared withered icon.
+
 The following plants will have a built-in icon:
 * Plants
     * Daisy
@@ -52,12 +59,11 @@ The following plants will have a built-in icon:
     * Oak
     * Maple
     * Pine
-    * Palm
+    * Coconut Palm
 * Other
     * Fern
     * Grass
     * Succulent
-    * Shrub
     * Basil
     * Bush
 
