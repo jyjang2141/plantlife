@@ -34,7 +34,6 @@ struct BedView: View {
 
     private var plants: [GardenPlant] { allPlants.filter { $0.plot == bed } }
     private var thirstyCount: Int { plants.filter { $0.isThirsty(at: now) }.count }
-    private var emptyPlots: Int { max(0, GardenPlot.plotCount - plants.count) }
 
     private var isPouring: Bool {
         guard let id = plantUnderCan else { return false }
@@ -174,25 +173,27 @@ struct BedView: View {
 
     private var bedGrid: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
-            ForEach(plants) { plant in
-                PlotTile(
-                    plant: plant,
-                    bed: bed,
-                    thirsty: plant.isThirsty(at: now),
-                    isUnderCan: plantUnderCan == plant.persistentModelID,
-                    progress: progress[plant.persistentModelID] ?? 0,
-                    onSelect: { selectedPlant = plant },
-                    onWater: { water(plant) },
-                    onRemove: { context.delete(plant) }
-                )
-                .onGeometryChange(for: CGRect.self) { proxy in
-                    proxy.frame(in: .named("bed"))
-                } action: { frame in
-                    plotFrames[plant.persistentModelID] = frame
+            // Each plant sits in the plot the kid picked when they planted it.
+            ForEach(Array(GardenPlant.arrange(plants).enumerated()), id: \.offset) { _, plant in
+                if let plant {
+                    PlotTile(
+                        plant: plant,
+                        bed: bed,
+                        thirsty: plant.isThirsty(at: now),
+                        isUnderCan: plantUnderCan == plant.persistentModelID,
+                        progress: progress[plant.persistentModelID] ?? 0,
+                        onSelect: { selectedPlant = plant },
+                        onWater: { water(plant) },
+                        onRemove: { context.delete(plant) }
+                    )
+                    .onGeometryChange(for: CGRect.self) { proxy in
+                        proxy.frame(in: .named("bed"))
+                    } action: { frame in
+                        plotFrames[plant.persistentModelID] = frame
+                    }
+                } else {
+                    EmptyPlot(bed: bed, onTap: onFindPlant)
                 }
-            }
-            ForEach(0..<emptyPlots, id: \.self) { _ in
-                EmptyPlot(bed: bed, onTap: onFindPlant)
             }
         }
         .padding(12)

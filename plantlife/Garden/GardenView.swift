@@ -25,7 +25,7 @@ struct GardenView: View {
                     ContentUnavailableView {
                         Label("Your garden is empty", systemImage: "leaf")
                     } description: {
-                        Text("Scan a plant on Discover and it will grow here.")
+                        Text("Scan a plant on Discover, then plant it from its Journal page.")
                     } actions: {
                         Button("Go to Discover") { selectedTab = 1 }
                             .buttonStyle(.borderedProminent).tint(.green)

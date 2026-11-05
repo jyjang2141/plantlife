@@ -8,6 +8,9 @@ struct JournalEntryDetailView: View {
     @Bindable var entry: JournalEntry
     @Environment(\.modelContext) private var context
     @State private var saveFailed = false
+    /// A second try at the bed question, for kids whose first guess was wrong.
+    @State private var retryGuess: GardenPlot?
+    @State private var showPlanting = false
 
     var body: some View {
         Group {
@@ -21,6 +24,11 @@ struct JournalEntryDetailView: View {
         .navigationTitle(entry.observationsCompleted ? entry.name : "New plant")
         .navigationBarTitleDisplayMode(.inline)
         .onDisappear { saveAnswers() }
+        .fullScreenCover(isPresented: $showPlanting) {
+            if let bed = entry.correctTerrain {
+                PlantingView(entry: entry, bed: bed)
+            }
+        }
         .alert("Your answers couldn't be saved yet", isPresented: $saveFailed) {
             Button("Try again") { saveAnswers() }
         } message: { Text("Please try saving again.") }
@@ -75,8 +83,10 @@ struct JournalEntryDetailView: View {
                 photo
                 Text("Found on " + entry.dateFound.formatted(date: .long, time: .shortened))
                     .font(.footnote).foregroundStyle(.secondary)
+                // Until it's planted, the bed question and the "Plant it" button come first.
+                if !entry.plantedInGarden { terrainFeedback }
                 if let info = entry.info { PlantResultView(info: info) }
-                terrainFeedback
+                if entry.plantedInGarden { terrainFeedback }
                 observationsCard
                 if !entry.observationAnswer.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
@@ -162,20 +172,48 @@ struct JournalEntryDetailView: View {
     }
 
     /// After the reveal: tells the kid if their terrain guess was right, and if not, why.
+    /// A wrong guess gets one more try. Then the kid plants it in the right bed.
     @ViewBuilder private var terrainFeedback: some View {
         if let guess = entry.terrainGuess, let correct = entry.correctTerrain {
             let isRight = guess == correct
+            let answerShown = isRight || retryGuess != nil || entry.plantedInGarden
             VStack(alignment: .leading, spacing: 10) {
                 Label(isRight ? "You got the terrain right!" : "Not quite the right terrain",
                       systemImage: isRight ? "checkmark.seal.fill" : "arrow.triangle.2.circlepath")
                     .font(.system(.headline, design: .rounded))
                     .foregroundStyle(isRight ? Theme.leaf : Theme.alert)
-                ForEach(terrainFeedbackLines(guess: guess, correct: correct), id: \.self) { line in
+                ForEach(terrainFeedbackLines(guess: guess, correct: correct, showAnswer: answerShown), id: \.self) { line in
                     Text(line).font(.system(.body, design: .rounded))
                 }
-                Label("\(entry.name) is growing in the \(correct.title) in your garden.", systemImage: correct.symbol)
-                    .font(.system(.subheadline, design: .rounded, weight: .semibold))
-                    .foregroundStyle(correct.tint)
+
+                if !answerShown {
+                    retryButtons(excluding: guess)
+                } else if let retryGuess, !isRight, !entry.plantedInGarden {
+                    Label(retryGuess == correct
+                          ? "Yes! The \(correct.title) is just right."
+                          : "Not that one either. It belongs in the \(correct.title).",
+                          systemImage: retryGuess == correct ? "checkmark.seal.fill" : "lightbulb.fill")
+                        .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                        .foregroundStyle(retryGuess == correct ? Theme.leaf : Theme.sun)
+                }
+
+                if entry.plantedInGarden {
+                    Label("\(entry.name) is growing in the \(correct.title) in your garden.", systemImage: correct.symbol)
+                        .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                        .foregroundStyle(correct.tint)
+                } else if answerShown {
+                    Button {
+                        showPlanting = true
+                    } label: {
+                        Label("Plant it in the \(correct.title)", systemImage: "leaf.fill")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.leaf)
+                    .padding(.top, 4)
+                }
             }
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -183,7 +221,29 @@ struct JournalEntryDetailView: View {
         }
     }
 
-    private func terrainFeedbackLines(guess: GardenPlot, correct: GardenPlot) -> [String] {
+    /// The other beds, as buttons, for a second guess.
+    private func retryButtons(excluding guess: GardenPlot) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Which bed fits it better? Try again!")
+                .font(.system(.subheadline, design: .rounded, weight: .semibold))
+            HStack(spacing: 10) {
+                ForEach(GardenPlot.allCases.filter { $0 != guess }) { plot in
+                    Button {
+                        withAnimation { retryGuess = plot }
+                    } label: {
+                        Label(plot.title, systemImage: plot.symbol)
+                            .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Theme.leaf)
+                }
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    private func terrainFeedbackLines(guess: GardenPlot, correct: GardenPlot, showAnswer: Bool) -> [String] {
         let needs = entry.info?.needs
         let plantNeeds = [needs?.sunlight, needs?.water].compactMap { $0?.isEmpty == false ? $0 : nil }
         var lines: [String] = []
@@ -196,7 +256,7 @@ struct JournalEntryDetailView: View {
         if !plantNeeds.isEmpty {
             lines.append(plantNeeds.joined(separator: " "))
         }
-        if guess != correct {
+        if guess != correct && showAnswer {
             lines.append("That's why it grows best in the \(correct.title): \(correct.needs.lowercased()).")
         }
         return lines

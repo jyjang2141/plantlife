@@ -10,8 +10,8 @@ import SwiftData
 import PhotosUI
 
 // MARK: - Discover: add a new plant
-// Every scan is saved to the Journal and planted in the Garden, then the
-// kid is sent straight to its Journal page to observe it before the reveal.
+// Every scan is saved to the Journal, then the kid is sent straight to its
+// Journal page to observe it, guess its bed, and plant it in the Garden.
 
 struct DiscoverView: View {
     @Binding var selectedTab: Int

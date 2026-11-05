@@ -190,6 +190,10 @@ private struct JournalRow: View {
                     Text("Answer the questions to reveal it!")
                         .font(.subheadline)
                         .foregroundStyle(.green)
+                } else if !entry.plantedInGarden {
+                    Text("Ready to plant in your garden!")
+                        .font(.subheadline)
+                        .foregroundStyle(.green)
                 } else if let scientific = entry.info?.scientificName, !scientific.isEmpty {
                     Text(scientific)
                         .font(.subheadline.italic())

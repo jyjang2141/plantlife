@@ -174,11 +174,15 @@ final class GardenPlant {
     var timesWatered: Int
     var lastWatered: Date?
     var datePlanted: Date
+    /// Which of the bed's 9 plots it's in (0 = top left, 8 = bottom right).
+    /// -1 for plants planted before kids could pick a plot; they fill the first free plots.
+    var slot: Int = -1
 
-    init(name: String, kind: PlantKind, plot: GardenPlot, datePlanted: Date = .now) {
+    init(name: String, kind: PlantKind, plot: GardenPlot, slot: Int = -1, datePlanted: Date = .now) {
         self.name = name
         self.kindRaw = kind.rawValue
         self.plotRaw = plot.rawValue
+        self.slot = slot
         self.growth = 0
         self.timesWatered = 0
         self.lastWatered = nil
@@ -206,5 +210,28 @@ final class GardenPlant {
         if isThirsty(at: date) && growth < Self.maxGrowth { growth += 1 }
         lastWatered = date
         timesWatered += 1
+    }
+
+    /// Lays one bed's plants out in its plots. Index = plot number, nil = open plot.
+    /// Plants that picked a plot keep it; older plants fill the first free plots.
+    /// Always at least 9 long; a bed with more than 9 plants gets extra plots on the end.
+    static func arrange(_ plants: [GardenPlant]) -> [GardenPlant?] {
+        var plots = [GardenPlant?](repeating: nil, count: GardenPlot.plotCount)
+        var unplaced: [GardenPlant] = []
+        for plant in plants {
+            if plots.indices.contains(plant.slot), plots[plant.slot] == nil {
+                plots[plant.slot] = plant
+            } else {
+                unplaced.append(plant)
+            }
+        }
+        for plant in unplaced {
+            if let free = plots.firstIndex(where: { $0 == nil }) {
+                plots[free] = plant
+            } else {
+                plots.append(plant)
+            }
+        }
+        return plots
     }
 }

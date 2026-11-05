@@ -28,6 +28,10 @@ final class JournalEntry {
     var terrainAnswer: String = ""
     /// True once the kid has answered the observation questions and seen the plant revealed.
     var observationsCompleted: Bool = false
+    /// True once the kid has dug, seeded, covered and watered this plant into the Garden.
+    /// Defaults to true so plants saved before this existed (already in the Garden) aren't planted twice;
+    /// new scans set it to false in init.
+    var plantedInGarden: Bool = true
     @Attribute(.externalStorage) var photoData: Data?
     /// The full AI answer (fun fact, needs, dangers...) saved as JSON.
     var infoData: Data
@@ -39,6 +43,7 @@ final class JournalEntry {
         self.dateFound = dateFound
         self.notes = ""
         self.isFavorite = false
+        self.plantedInGarden = false
     }
 
     var info: PlantInfo? { try? JSONDecoder().decode(PlantInfo.self, from: infoData) }
