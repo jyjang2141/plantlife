@@ -17,6 +17,11 @@ struct GardenPlantDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var journalEntries: [JournalEntry]
     @State private var confirmRemove = false
+    @State private var detent: PresentationDetent = .large
+    @State private var draggingBug = false
+    /// A helper bug (ladybug, bee, butterfly) the kid dragged off; asks "are you sure?".
+    @State private var helperToRemove: BugKind?
+    @State private var notice: String?
 
     /// The journal page saved at the same moment this plant was planted.
     private var journalEntry: JournalEntry? {
@@ -32,13 +37,16 @@ struct GardenPlantDetailView: View {
                 ScrollView {
                     VStack(spacing: 18) {
                         header(now: timeline.date)
+                            .zIndex(1)   // a dragged bug stays on top of the cards below
                         growthCard
+                        bugsCard(now: timeline.date)
                         if let needs = journalEntry?.info?.needs { needsCard(needs) }
                         statsCard
                         actions
                     }
                     .padding(20)
                 }
+                .scrollDisabled(draggingBug)
             }
             .background(Theme.background)
             .navigationTitle(plant.name)
@@ -48,6 +56,20 @@ struct GardenPlantDetailView: View {
                     Button("Done") { dismiss() }
                 }
             }
+            .alert("Ouch! That's a helper bug", isPresented: Binding(
+                get: { helperToRemove != nil },
+                set: { if !$0 { helperToRemove = nil } }
+            ), presenting: helperToRemove) { kind in
+                Button("Let it stay", role: .cancel) {}
+                Button("Move it anyway", role: .destructive) { moveAway(kind) }
+            } message: { kind in
+                Text(Self.helperReason(kind))
+            }
+            .task(id: notice) {
+                guard notice != nil else { return }
+                try? await Task.sleep(for: .seconds(4))
+                withAnimation { notice = nil }
+            }
             .confirmationDialog("Remove \(plant.name) from your garden?",
                                 isPresented: $confirmRemove, titleVisibility: .visible) {
                 Button("Remove", role: .destructive) { onRemove() }
@@ -55,8 +77,9 @@ struct GardenPlantDetailView: View {
                 Text("It will stay in your Journal.")
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.medium, .large], selection: $detent)
         .presentationDragIndicator(.visible)
+        .interactiveDismissDisabled(draggingBug)
     }
 
     // MARK: Pieces
@@ -64,12 +87,19 @@ struct GardenPlantDetailView: View {
     private func header(now: Date) -> some View {
         let thirsty = plant.isThirsty(at: now)
         return VStack(spacing: 10) {
-            PlantSprite(kind: plant.kind, growth: plant.growth, droopy: thirsty, size: 110)
-                .frame(height: 130, alignment: .bottom)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(thirsty ? plant.plot.drySoil : plant.plot.wetSoil,
-                            in: RoundedRectangle(cornerRadius: 24))
+            closeup(now: now, thirsty: thirsty)
+
+            if let notice {
+                Label(notice, systemImage: "checkmark.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.leaf)
+                    .multilineTextAlignment(.center)
+                    .transition(.opacity)
+            } else if !plant.bugs(at: now).isEmpty {
+                Label("Drag a bug off the plant to move it away.", systemImage: "hand.draw")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
 
             Label("Lives in the \(plant.plot.title)", systemImage: plant.plot.symbol)
                 .font(.headline)
@@ -84,6 +114,80 @@ struct GardenPlantDetailView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.blue)
             }
+        }
+    }
+
+    /// The plant up close, standing in its soil, with its bugs on it. Kids drag bugs off to move them away.
+    private func closeup(now: Date, thirsty: Bool) -> some View {
+        PlantWithBugs(plant: plant, droopy: thirsty, size: 220, now: now,
+                      onDragOff: { kind in draggedOff(kind) },
+                      onDragging: { draggingBug = $0 })
+            .frame(maxWidth: .infinity)
+            .frame(height: 236, alignment: .bottom)
+            // Only the background is clipped, so a bug can be dragged out past the edge.
+            .background {
+                ZStack(alignment: .bottom) {
+                    LinearGradient(colors: [Color.cyan.opacity(0.22), Color.green.opacity(0.10)],
+                                   startPoint: .top, endPoint: .bottom)
+                    Rectangle()
+                        .fill(thirsty ? plant.plot.drySoil : plant.plot.wetSoil)
+                        .frame(height: 34)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 24))
+            }
+            .zIndex(1)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(closeupDescription(now: now))
+            .accessibilityActions {
+                ForEach(plant.bugs(at: now)) { kind in
+                    Button("Move the \(kind.name.lowercased()) away") { draggedOff(kind) }
+                }
+            }
+    }
+
+    private func closeupDescription(now: Date) -> String {
+        let bugs = plant.bugs(at: now).map { "a " + $0.name.lowercased() }
+        var text = "\(plant.name), \(plant.stageName)"
+        if plant.leafHoles > 0 { text += ", with chewed, wilted leaves" }
+        text += bugs.isEmpty ? ". No bugs on it." : ". On it: " + bugs.joined(separator: ", ") + "."
+        return text
+    }
+
+    /// A bug was dragged off the plant. Caterpillars go; helper bugs ask first.
+    private func draggedOff(_ kind: BugKind) {
+        if kind == .caterpillar {
+            moveAway(kind)
+        } else {
+            helperToRemove = kind
+        }
+    }
+
+    private func moveAway(_ kind: BugKind) {
+        withAnimation(.spring(duration: 0.4)) {
+            switch kind {
+            case .caterpillar:
+                plant.removeCaterpillar()
+                notice = "You moved the caterpillar away! The leaves grow back in \(BugRules.healText)."
+            case .ladybug:
+                plant.shooLadybug()
+                notice = "The ladybug flew away. Caterpillars might come back now."
+            case .bee, .butterfly:
+                plant.shooPollinator()
+                notice = "The \(kind.name.lowercased()) flew away."
+            }
+        }
+    }
+
+    static func helperReason(_ kind: BugKind) -> String {
+        switch kind {
+        case .ladybug:
+            "Ladybugs are good for your garden! They eat tiny bug eggs, so caterpillars stay away. Try to let it stay."
+        case .bee:
+            "Bees are good for your garden! They carry pollen from flower to flower so plants can make seeds. Try to let it stay."
+        case .butterfly:
+            "Butterflies are good for your garden! They carry pollen from flower to flower so plants can make seeds. Try to let it stay."
+        case .caterpillar:
+            ""
         }
     }
 
@@ -104,12 +208,59 @@ struct GardenPlantDetailView: View {
                         .frame(maxWidth: .infinity)
                     }
                 }
-                Text(plant.growth >= GardenPlant.maxGrowth
-                     ? "\(plant.name) is fully grown! Keep watering to keep it happy."
-                     : "Water it when it's thirsty to help it grow.")
+                Text(growthHint)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    private var growthHint: String {
+        if plant.growth >= GardenPlant.maxGrowth { return "\(plant.name) is fully grown! Keep watering to keep it happy." }
+        if plant.leafHoles > 0 {
+            return plant.halfGrown
+                ? "Halfway to the next stage! Chewed leaves mean it needs 2 drinks to grow."
+                : "Chewed leaves slow it down: it needs 2 drinks to grow each stage."
+        }
+        return "Water it when it's thirsty to help it grow."
+    }
+
+    // MARK: Bugs
+
+    private func bugsCard(now: Date) -> some View {
+        let quiet = !plant.hasCaterpillar && plant.leavesHealDate == nil
+            && !plant.hasLadybug(at: now) && !plant.isPollinated(at: now)
+        return card(title: "Bugs", icon: "ladybug.fill", tint: Theme.alert) {
+            VStack(alignment: .leading, spacing: 12) {
+                if plant.hasCaterpillar {
+                    bugRow(.caterpillar, "A caterpillar is chewing holes in the leaves, so they're wilting and falling off. Chewed plants grow more slowly. Drag it off the plant up top to move it away.")
+                } else if let heal = plant.leavesHealDate {
+                    bugRow(.caterpillar, "The caterpillar is gone! The chewed leaves grow back \(heal.formatted(.relative(presentation: .named))).")
+                }
+                if plant.hasLadybug(at: now) {
+                    bugRow(.ladybug, "A ladybug is guarding it. Ladybugs eat tiny bug eggs, so new caterpillars stay away.")
+                }
+                if let pollinator = plant.pollinator(at: now) {
+                    bugRow(pollinator, "A \(pollinator.name.lowercased()) is resting on its flowers.")
+                }
+                if plant.isPollinated(at: now) {
+                    bugRow(.bee, plant.pollenBoost
+                           ? "A pollinator visited its flowers today! Water it when it's thirsty for a growth boost."
+                           : "A pollinator visited its flowers today. Pollen helps plants make seeds.")
+                }
+                if quiet {
+                    Text("No bugs right now. Bees and butterflies visit flowers, and ladybugs keep caterpillars away. Invite them from the Bugs tray in the bed.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private func bugRow(_ kind: BugKind, _ text: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            BugSprite(kind: kind).frame(width: 30, height: 30)
+            Text(text).font(.subheadline)
         }
     }
 
@@ -130,6 +281,12 @@ struct GardenPlantDetailView: View {
                 Text(plant.timesWatered == 1 ? "Watered 1 time" : "Watered \(plant.timesWatered) times")
                 if let last = plant.lastWatered {
                     Text("Last watered \(last.formatted(.relative(presentation: .named)))")
+                }
+                if plant.timesPollinated > 0 {
+                    Text(plant.timesPollinated == 1 ? "Pollinated 1 time" : "Pollinated \(plant.timesPollinated) times")
+                }
+                if plant.caterpillarsMoved > 0 {
+                    Text(plant.caterpillarsMoved == 1 ? "Moved 1 caterpillar away" : "Moved \(plant.caterpillarsMoved) caterpillars away")
                 }
             }
             .font(.subheadline)

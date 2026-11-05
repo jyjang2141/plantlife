@@ -45,11 +45,12 @@ struct GardenView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.green.opacity(0.07))
             .navigationTitle("My Garden")
-            // Re-checks every few seconds so plants get thirsty on their own.
+            // Re-checks every few seconds so plants get thirsty, and caterpillars come and chew, on their own.
             .task {
                 while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(5))
+                    BugRules.update(plants)
                     now = .now
+                    try? await Task.sleep(for: .seconds(5))
                 }
             }
             .fullScreenCover(item: $openBed) { bed in
@@ -94,6 +95,12 @@ struct GardenView: View {
     }
 
     private var statusLine: String {
+        let caterpillars = plants.filter(\.hasCaterpillar).count
+        if caterpillars > 0 {
+            return caterpillars == 1
+                ? "A caterpillar is chewing leaves! Open its bed to move it."
+                : "\(caterpillars) caterpillars are chewing leaves! Open their beds to move them."
+        }
         let thirsty = plants.filter { $0.isThirsty(at: now) }.count
         switch thirsty {
         case 0:  return "Everyone is happy! Check back soon."
@@ -111,6 +118,7 @@ private struct BedCard: View {
     let now: Date
 
     private var thirstyCount: Int { plants.filter { $0.isThirsty(at: now) }.count }
+    private var caterpillarCount: Int { plants.filter(\.hasCaterpillar).count }
     private static let previewLimit = 6
 
     var body: some View {
@@ -128,6 +136,12 @@ private struct BedCard: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
+                if caterpillarCount > 0 {
+                    HStack(spacing: 2) {
+                        BugSprite(kind: .caterpillar).frame(width: 22, height: 22)
+                        Text("\(caterpillarCount)").font(.caption.bold()).foregroundStyle(.orange)
+                    }
+                }
                 if thirstyCount > 0 {
                     Label("\(thirstyCount) thirsty", systemImage: "drop")
                         .font(.caption.bold()).foregroundStyle(.orange)
@@ -154,7 +168,9 @@ private struct BedCard: View {
         .background(Theme.card.opacity(0.75), in: RoundedRectangle(cornerRadius: 22))
         .contentShape(RoundedRectangle(cornerRadius: 22))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(bed.title). \(plants.count) of \(GardenPlot.plotCount) plots used, \(thirstyCount) thirsty. \(bed.sunlight), \(bed.climate).")
+        .accessibilityLabel("\(bed.title). \(plants.count) of \(GardenPlot.plotCount) plots used, \(thirstyCount) thirsty"
+                            + (caterpillarCount > 0 ? ", \(caterpillarCount) with caterpillars" : "")
+                            + ". \(bed.sunlight), \(bed.climate).")
     }
 
     /// A little peek at the soil and the plants growing in it.
@@ -177,8 +193,7 @@ private struct BedCard: View {
             } else {
                 HStack(alignment: .bottom, spacing: 2) {
                     ForEach(Array(plants.prefix(Self.previewLimit))) { plant in
-                        PlantSprite(kind: plant.kind, growth: plant.growth,
-                                    droopy: plant.isThirsty(at: now), size: 44)
+                        PlantWithBugs(plant: plant, droopy: plant.isThirsty(at: now), size: 44, now: now)
                     }
                     Spacer(minLength: 4)
                     Text(extraText)

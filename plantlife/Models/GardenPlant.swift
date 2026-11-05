@@ -178,6 +178,29 @@ final class GardenPlant {
     /// -1 for plants planted before kids could pick a plot; they fill the first free plots.
     var slot: Int = -1
 
+    // Bugs (the rules are in Bugs.swift)
+    /// When a caterpillar moved onto this plant. nil = no caterpillar.
+    var caterpillarSince: Date? = nil
+    /// When the last caterpillar was moved away. Chewed leaves grow back a day later.
+    var caterpillarGoneAt: Date? = nil
+    /// How chewed the leaves are: 0 = fine, 3 = lots of holes.
+    var leafHoles: Int = 0
+    /// Chewed plants need two drinks to grow a stage. True after the first one.
+    var halfGrown: Bool = false
+    /// A ladybug guards the plant until this time.
+    var ladybugUntil: Date? = nil
+    /// A bee or butterfly sitting on its flowers (a BugKind raw value), until `pollinatorUntil`.
+    var pollinatorRaw: String = ""
+    var pollinatorUntil: Date? = nil
+    /// The last time a bee or butterfly pollinated its flowers.
+    var lastPollinated: Date? = nil
+    /// Pollinated plants grow an extra stage on their next drink.
+    var pollenBoost: Bool = false
+    /// When the garden next rolls the dice for a caterpillar on this plant.
+    var nextBugRoll: Date? = nil
+    var timesPollinated: Int = 0
+    var caterpillarsMoved: Int = 0
+
     init(name: String, kind: PlantKind, plot: GardenPlot, slot: Int = -1, datePlanted: Date = .now) {
         self.name = name
         self.kindRaw = kind.rawValue
@@ -205,11 +228,35 @@ final class GardenPlant {
         return date.timeIntervalSince(lastWatered) > thirstInterval
     }
 
+    enum WaterResult {
+        case grew        // one stage
+        case grewExtra   // two stages, thanks to pollinated flowers
+        case slowed      // chewed leaves: halfway there, needs another drink
+        case happy       // wasn't thirsty, or already fully grown
+    }
+
     /// Watering a thirsty plant makes it grow one stage.
-    func water(at date: Date = .now) {
-        if isThirsty(at: date) && growth < Self.maxGrowth { growth += 1 }
-        lastWatered = date
-        timesWatered += 1
+    /// Chewed leaves slow it down to one stage every two drinks.
+    @discardableResult
+    func water(at date: Date = .now) -> WaterResult {
+        defer {
+            lastWatered = date
+            timesWatered += 1
+        }
+        guard isThirsty(at: date), growth < Self.maxGrowth else { return .happy }
+        if leafHoles > 0 && !halfGrown {
+            halfGrown = true
+            return .slowed
+        }
+        halfGrown = false
+        if pollenBoost && growth + 2 <= Self.maxGrowth {
+            pollenBoost = false
+            growth += 2
+            return .grewExtra
+        }
+        pollenBoost = false
+        growth += 1
+        return .grew
     }
 
     /// Lays one bed's plants out in its plots. Index = plot number, nil = open plot.

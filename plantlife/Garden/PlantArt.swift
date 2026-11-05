@@ -16,32 +16,78 @@ struct PlantSprite: View {
     let growth: Int
     let droopy: Bool
     var size: CGFloat = 100
-
-    private var scale: CGFloat {
-        growth == 0 ? 1 : 0.75 + CGFloat(min(growth, GardenPlant.maxGrowth)) * 0.083
-    }
+    /// Caterpillar damage, 0 to 3. Each level bites two more holes through the leaves.
+    var holes: Int = 0
 
     var body: some View {
-        Canvas { context, canvasSize in
-            // All drawing below uses an 80 x 80 box with the ground at the bottom.
-            context.scaleBy(x: canvasSize.width / 80, y: canvasSize.height / 80)
-            if growth == 0 {
-                PlantDrawing.seedling(in: &context)
-            } else {
-                switch kind {
-                case .sunflower: PlantDrawing.sunflower(in: &context)
-                case .cactus:    PlantDrawing.cactus(in: &context)
-                case .standard:  PlantDrawing.leafy(in: &context)
+        ZStack {
+            Canvas { context, canvasSize in
+                // All drawing below uses an 80 x 80 box with the ground at the bottom.
+                context.scaleBy(x: canvasSize.width / 80, y: canvasSize.height / 80)
+                context.drawLayer { layer in
+                    if growth == 0 {
+                        PlantDrawing.seedling(in: &layer)
+                    } else {
+                        switch kind {
+                        case .sunflower: PlantDrawing.sunflower(in: &layer)
+                        case .cactus:    PlantDrawing.cactus(in: &layer)
+                        case .standard:  PlantDrawing.leafy(in: &layer)
+                        }
+                    }
+                    // Punch see-through holes where the caterpillar chewed.
+                    if holes > 0 {
+                        layer.blendMode = .destinationOut
+                        for spot in PlantDrawing.holeSpots(kind: kind, growth: growth).prefix(min(holes, 3) * 2) {
+                            layer.fill(Path(ellipseIn: CGRect(x: spot.x - 2.5, y: spot.y - 2, width: 5, height: 4)),
+                                       with: .color(.black))
+                        }
+                    }
                 }
+            }
+            // Thirsty plants droop. Chewed plants wilt: they slump, lean, and turn a little yellow.
+            .scaleEffect(x: 1, y: Self.squash(holes: holes), anchor: .bottom)
+            .rotationEffect(.degrees(Self.lean(droopy: droopy, holes: holes)), anchor: .bottom)
+            .saturation(droopy ? 0.35 : 1)
+            .colorMultiply(Self.wiltTint(holes: holes))
+
+            // Leaves that dropped off the chewed plant, lying on the ground.
+            if holes > 0 {
+                Canvas { context, canvasSize in
+                    context.scaleBy(x: canvasSize.width / 80, y: canvasSize.height / 80)
+                    PlantDrawing.fallenLeaves(in: &context, kind: kind, count: min(holes, 3))
+                }
+                .transition(.opacity)
             }
         }
         .frame(width: size, height: size)
-        .scaleEffect(scale, anchor: .bottom)
-        .rotationEffect(.degrees(droopy ? -10 : 0), anchor: .bottom)
-        .saturation(droopy ? 0.35 : 1)
+        .scaleEffect(Self.growthScale(growth), anchor: .bottom)
         .animation(.spring(duration: 0.6), value: growth)
         .animation(.easeInOut(duration: 0.5), value: droopy)
+        .animation(.easeInOut(duration: 0.6), value: holes)
         .accessibilityHidden(true)
+    }
+
+    // These are shared with PlantWithBugs, so bugs sit in the right spot on a leaning plant.
+
+    /// Bigger plants are drawn bigger.
+    static func growthScale(_ growth: Int) -> CGFloat {
+        growth == 0 ? 1 : 0.75 + CGFloat(min(growth, GardenPlant.maxGrowth)) * 0.083
+    }
+
+    /// Degrees the plant tips over (negative = to the left).
+    static func lean(droopy: Bool, holes: Int) -> Double {
+        (droopy ? -10 : 0) - (holes > 0 ? 2 + 2 * Double(min(holes, 3)) : 0)
+    }
+
+    /// How much a chewed plant slumps (1 = standing tall).
+    static func squash(holes: Int) -> CGFloat {
+        1 - 0.03 * CGFloat(min(holes, 3))
+    }
+
+    /// Chewed leaves turn yellowish. White = no change.
+    static func wiltTint(holes: Int) -> Color {
+        let h = Double(min(holes, 3))
+        return Color(red: 1, green: 1 - 0.05 * h, blue: 1 - 0.24 * h)
     }
 }
 
@@ -56,6 +102,45 @@ private enum PlantDrawing {
     static let cactusRib   = Color(red: 0.22, green: 0.50, blue: 0.27)
     static let bloom       = Color(red: 0.98, green: 0.45, blue: 0.60)
     static let sprout      = Color(red: 0.50, green: 0.80, blue: 0.35)
+
+    /// Spots on the leaves for caterpillar holes (in the 80 x 80 box), in the order they get chewed.
+    static func holeSpots(kind: PlantKind, growth: Int) -> [CGPoint] {
+        let spots: [(CGFloat, CGFloat)]
+        if growth == 0 {
+            spots = [(29, 57), (50, 56), (34, 58), (46, 58), (26, 56), (54, 55)]
+        } else {
+            switch kind {
+            case .sunflower: spots = [(28, 59), (47, 49.5), (34, 58.5), (53, 50), (40, 10), (27, 25)]
+            case .cactus:    spots = [(37, 40), (43, 58), (25, 47), (55, 38), (40, 66), (44, 30)]
+            case .standard:  spots = [(31, 54), (49, 54), (37.5, 44), (42.5, 56), (27.5, 47), (52.5, 47)]
+            }
+        }
+        return spots.map { CGPoint(x: $0.0, y: $0.1) }
+    }
+
+    /// Up to three dropped leaves on the ground (bits of cactus for cacti).
+    static func fallenLeaves(in context: inout GraphicsContext, kind: PlantKind, count: Int) {
+        let spots: [(x: CGFloat, y: CGFloat, angle: Double)] = [(22, 75.5, -18), (58, 76, 24), (31, 77.5, 8)]
+        for (index, spot) in spots.prefix(count).enumerated() {
+            var leaf = context
+            leaf.translateBy(x: spot.x, y: spot.y)
+            leaf.rotate(by: .degrees(spot.angle))
+            if kind == .cactus {
+                leaf.fill(Path(roundedRect: CGRect(x: -3.5, y: -2, width: 7, height: 4), cornerRadius: 2),
+                          with: .color(Color(red: 0.45, green: 0.62, blue: 0.36)))
+            } else {
+                let color = index == 1 ? Color(red: 0.72, green: 0.57, blue: 0.24) : Color(red: 0.60, green: 0.66, blue: 0.24)
+                leaf.fill(Path { p in
+                    p.move(to: CGPoint(x: -6, y: 0))
+                    p.addQuadCurve(to: CGPoint(x: 6, y: 0), control: CGPoint(x: 0, y: -5))
+                    p.addQuadCurve(to: CGPoint(x: -6, y: 0), control: CGPoint(x: 0, y: 5))
+                }, with: .color(color))
+                leaf.stroke(Path { p in
+                    p.move(to: CGPoint(x: -5, y: 0)); p.addLine(to: CGPoint(x: 5, y: 0))
+                }, with: .color(.black.opacity(0.18)), lineWidth: 0.6)
+            }
+        }
+    }
 
     static func seedling(in context: inout GraphicsContext) {
         context.stroke(Path { p in
