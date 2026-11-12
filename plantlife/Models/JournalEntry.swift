@@ -54,6 +54,6 @@ final class JournalEntry {
     /// The bed this plant really belongs in: the same rule PlantRecorder uses to plant it.
     var correctTerrain: GardenPlot? {
         guard let info else { return nil }
-        return GardenPlot.from(kind: PlantKind.from(info: info), info: info)
+        return GardenPlot.from(species: PlantSpecies.match(info), info: info)
     }
 }

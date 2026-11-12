@@ -9,27 +9,6 @@ import Foundation
 import SwiftData
 import SwiftUI
 
-// MARK: - What a garden plant looks like
-
-enum PlantKind: String, Codable {
-    case sunflower, cactus, standard
-
-    var emoji: String {
-        switch self {
-        case .sunflower: "🌻"
-        case .cactus:    "🌵"
-        case .standard:  "🪴"
-        }
-    }
-
-    static func from(info: PlantInfo) -> PlantKind {
-        let text = "\(info.commonName ?? "") \(info.scientificName ?? "")".lowercased()
-        if text.contains("sunflower") || text.contains("helianthus") { return .sunflower }
-        if text.contains("cactus") || text.contains("cacti") || text.contains("cactaceae") { return .cactus }
-        return .standard
-    }
-}
-
 // MARK: - Where a plant lives in the garden (based on its needs)
 
 enum GardenPlot: String, Codable, CaseIterable, Identifiable {
@@ -147,14 +126,10 @@ enum GardenPlot: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    /// Sunflowers and cacti always go to their own beds.
+    /// Some plants always go in the same bed (see `PlantSpecies.terrain`).
     /// For everything else, we use the bed the AI picked from the plant's needs.
-    static func from(kind: PlantKind, info: PlantInfo?) -> GardenPlot {
-        switch kind {
-        case .cactus:    return .desert
-        case .sunflower: return .sunny
-        case .standard:  return info?.gardenPlot.flatMap(GardenPlot.init(rawValue:)) ?? .sunny
-        }
+    static func from(species: PlantSpecies, info: PlantInfo?) -> GardenPlot {
+        species.terrain ?? info?.gardenPlot.flatMap(GardenPlot.init(rawValue:)) ?? .sunny
     }
 }
 
@@ -165,15 +140,19 @@ final class GardenPlant {
     /// How long until a plant is thirsty again (before the bed's multiplier).
     /// 60 * 60 * 12 for twice a day.
     static let baseThirstInterval: TimeInterval = 60 * 60 * 12
-    static let maxGrowth = 3
 
     var name: String
+    /// The `PlantSpecies` raw value (named before the icon database existed).
     var kindRaw: String
     var plotRaw: String = ""
     var growth: Int
     var timesWatered: Int
     var lastWatered: Date?
     var datePlanted: Date
+    /// The flower color the AI saw in the photo ("" if none).
+    var flowerColorRaw: String = ""
+    /// Whether a default plant gets budding and flowering stages.
+    var canFlower: Bool = false
     /// Which of the bed's 9 plots it's in (0 = top left, 8 = bottom right).
     /// -1 for plants planted before kids could pick a plot; they fill the first free plots.
     var slot: Int = -1
@@ -201,27 +180,44 @@ final class GardenPlant {
     var timesPollinated: Int = 0
     var caterpillarsMoved: Int = 0
 
-    init(name: String, kind: PlantKind, plot: GardenPlot, slot: Int = -1, datePlanted: Date = .now) {
+    init(name: String, species: PlantSpecies, plot: GardenPlot, slot: Int = -1, flowerColor: FlowerColor? = nil,
+         canFlower: Bool = false, datePlanted: Date = .now) {
         self.name = name
-        self.kindRaw = kind.rawValue
+        self.kindRaw = species.rawValue
         self.plotRaw = plot.rawValue
         self.slot = slot
+        self.flowerColorRaw = flowerColor?.rawValue ?? ""
+        self.canFlower = canFlower
         self.growth = 0
         self.timesWatered = 0
         self.lastWatered = nil
         self.datePlanted = datePlanted
     }
 
-    var kind: PlantKind { PlantKind(rawValue: kindRaw) ?? .standard }
+    var species: PlantSpecies { PlantSpecies(rawValue: kindRaw) ?? .other }
 
-    /// Plants saved before beds existed fall back to a bed based on their kind.
-    var plot: GardenPlot { GardenPlot(rawValue: plotRaw) ?? .from(kind: kind, info: nil) }
+    /// Plants saved before beds existed fall back to a bed based on their species.
+    var plot: GardenPlot { GardenPlot(rawValue: plotRaw) ?? .from(species: species, info: nil) }
+
+    /// Every stage this plant will grow through, in order.
+    var stages: [GrowthStage] { species.stages(canFlower: canFlower) }
+
+    /// Each watering of a thirsty plant moves it one stage along, up to its last stage.
+    var maxGrowth: Int { stages.count - 1 }
+
+    var stage: GrowthStage { stages[min(growth, maxGrowth)] }
+
+    /// The photo's flower color for plants that match it; the classic color otherwise.
+    var flowerColor: FlowerColor {
+        guard species.matchesPhotoFlowerColor, let color = FlowerColor(rawValue: flowerColorRaw) else {
+            return species.classicFlowerColor
+        }
+        return color
+    }
 
     var thirstInterval: TimeInterval { Self.baseThirstInterval * plot.thirstMultiplier }
 
-    var stageName: String {
-        ["Seedling", "Sprout", "Growing", "Fully grown"][min(growth, Self.maxGrowth)]
-    }
+    var stageName: String { stage.title }
 
     func isThirsty(at date: Date = .now) -> Bool {
         guard let lastWatered else { return true }
@@ -243,13 +239,13 @@ final class GardenPlant {
             lastWatered = date
             timesWatered += 1
         }
-        guard isThirsty(at: date), growth < Self.maxGrowth else { return .happy }
+        guard isThirsty(at: date), growth < maxGrowth else { return .happy }
         if leafHoles > 0 && !halfGrown {
             halfGrown = true
             return .slowed
         }
         halfGrown = false
-        if pollenBoost && growth + 2 <= Self.maxGrowth {
+        if pollenBoost && growth + 2 <= maxGrowth {
             pollenBoost = false
             growth += 2
             return .grewExtra

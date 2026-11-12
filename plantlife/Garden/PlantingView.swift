@@ -103,7 +103,7 @@ private struct PlotPicker: View {
 
     private func takenPlot(_ plant: GardenPlant) -> some View {
         VStack(spacing: 2) {
-            PlantSprite(kind: plant.kind, growth: plant.growth, droopy: false, size: 60)
+            PlantSprite(plant: plant, size: 60, holes: plant.leafHoles)
                 .frame(height: 70, alignment: .bottom)
             Text(plant.name)
                 .font(.caption.weight(.semibold))
@@ -185,7 +185,8 @@ private struct PlantingActivity: View {
     /// Watering fills in about 2 seconds of holding.
     private let waterPerTick = 0.025
 
-    private var kind: PlantKind { entry.info.map(PlantKind.from(info:)) ?? .standard }
+    private var species: PlantSpecies { entry.info.map(PlantSpecies.match) ?? .other }
+    private var flowerColor: FlowerColor? { entry.info?.flowerColor.flatMap(FlowerColor.init(rawValue:)) }
 
     private var isPouring: Bool {
         guard step == .water, let point = fingerPoint else { return false }
@@ -282,7 +283,7 @@ private struct PlantingActivity: View {
             .overlay {
                 if step == .done {
                     // The sprite's ground line sits on the little mound in the middle.
-                    PlantSprite(kind: kind, growth: 0, droopy: false, size: 130)
+                    PlantSprite(species: species, stage: .sprout, flowerColor: flowerColor, size: 130)
                         .offset(y: -40)
                         .transition(.scale(scale: 0.1, anchor: .bottom).combined(with: .opacity))
                 }
@@ -775,7 +776,7 @@ private struct SeedArt: View {
     )
     let entry = JournalEntry(name: "Marigold", photoData: nil, infoData: Data())
     container.mainContext.insert(entry)
-    container.mainContext.insert(GardenPlant(name: "Sunflower", kind: .sunflower, plot: .sunny, slot: 0))
-    container.mainContext.insert(GardenPlant(name: "Basil", kind: .standard, plot: .sunny, slot: 4))
+    container.mainContext.insert(GardenPlant(name: "Sunflower", species: .sunflower, plot: .sunny, slot: 0))
+    container.mainContext.insert(GardenPlant(name: "Basil", species: .basil, plot: .sunny, slot: 4))
     return PlantingView(entry: entry, bed: .sunny).modelContainer(container)
 }

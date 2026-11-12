@@ -459,8 +459,10 @@ struct BedView: View {
                 celebrations += 1
             }
         case .bee, .butterfly:
-            if !plant.hasFlowers {
-                say("Seedlings don't have flowers yet. Bees and butterflies visit flowers, so let it grow first!")
+            if !plant.makesFlowers {
+                say("\(plant.name) doesn't make flowers. Bees and butterflies visit flowers, so try a flowering plant!")
+            } else if !plant.hasFlowers {
+                say("\(plant.name) isn't flowering yet. Bees and butterflies visit flowers, so let it grow first!")
             } else if let visiting = plant.pollinator(at: date) {
                 say("A \(visiting.name.lowercased()) is already sitting on \(plant.name)'s flowers.")
             } else if visitors.contains(where: { $0.plantID == plant.persistentModelID }) {
@@ -721,9 +723,9 @@ private struct EmptyPlot: View {
         for: JournalEntry.self, GardenPlant.self,
         configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
-    container.mainContext.insert(GardenPlant(name: "Sunflower", kind: .sunflower, plot: .sunny))
-    container.mainContext.insert(GardenPlant(name: "Marigold", kind: .standard, plot: .sunny))
-    let basil = GardenPlant(name: "Basil", kind: .standard, plot: .sunny)
+    container.mainContext.insert(GardenPlant(name: "Sunflower", species: .sunflower, plot: .sunny))
+    container.mainContext.insert(GardenPlant(name: "Marigold", species: .other, plot: .sunny, flowerColor: .orange, canFlower: true))
+    let basil = GardenPlant(name: "Basil", species: .basil, plot: .sunny)
     basil.growth = 2
     basil.addCaterpillar()
     basil.chew()

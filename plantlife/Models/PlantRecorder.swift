@@ -32,8 +32,13 @@ enum PlantRecorder {
     @MainActor
     static func plant(_ entry: JournalEntry, in bed: GardenPlot, slot: Int, context: ModelContext) {
         guard !entry.plantedInGarden else { return }
-        let kind = entry.info.map(PlantKind.from(info:)) ?? .standard
-        let plant = GardenPlant(name: entry.name, kind: kind, plot: bed, slot: slot)
+        let info = entry.info
+        let plant = GardenPlant(name: entry.name,
+                                species: info.map(PlantSpecies.match) ?? .other,
+                                plot: bed,
+                                slot: slot,
+                                flowerColor: info?.flowerColor.flatMap(FlowerColor.init(rawValue:)),
+                                canFlower: info?.flowers ?? false)
         // The planting activity ends with a drink, so it starts out happy (still a seedling).
         plant.lastWatered = .now
         plant.timesWatered = 1

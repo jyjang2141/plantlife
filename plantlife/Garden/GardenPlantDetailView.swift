@@ -268,15 +268,18 @@ struct GardenPlantDetailView: View {
         card(title: "Growing up", icon: "chart.line.uptrend.xyaxis", tint: Theme.leaf) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 0) {
-                    ForEach(0...GardenPlant.maxGrowth, id: \.self) { stage in
+                    ForEach(Array(plant.stages.enumerated()), id: \.offset) { index, stage in
+                        let current = index == min(plant.growth, plant.maxGrowth)
                         VStack(spacing: 4) {
-                            PlantSprite(kind: plant.kind, growth: stage, droopy: false, size: 36)
+                            PlantSprite(plant: plant, stage: stage, size: 36)
                                 .frame(height: 40, alignment: .bottom)
-                                .opacity(stage <= plant.growth ? 1 : 0.25)
-                            Text(["Seedling", "Sprout", "Growing", "Grown"][stage])
+                                .opacity(index <= plant.growth ? 1 : 0.25)
+                            Text(stage.title)
                                 .font(.caption2)
-                                .foregroundStyle(stage == plant.growth ? .primary : .secondary)
-                                .fontWeight(stage == plant.growth ? .bold : .regular)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                                .foregroundStyle(current ? .primary : .secondary)
+                                .fontWeight(current ? .bold : .regular)
                         }
                         .frame(maxWidth: .infinity)
                     }
@@ -289,7 +292,7 @@ struct GardenPlantDetailView: View {
     }
 
     private var growthHint: String {
-        if plant.growth >= GardenPlant.maxGrowth { return "\(plant.name) is fully grown! Keep watering to keep it happy." }
+        if plant.growth >= plant.maxGrowth { return "\(plant.name) is fully grown! Keep watering to keep it happy." }
         if plant.leafHoles > 0 {
             return plant.halfGrown
                 ? "Halfway to the next stage! Chewed leaves mean it needs 2 drinks to grow."

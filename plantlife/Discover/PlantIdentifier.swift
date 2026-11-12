@@ -24,6 +24,9 @@ nonisolated struct PlantInfo: Codable, Equatable {
     let safetyNote: String?
     let message: String?           // only used when isPlant == false
     let gardenPlot: String?        // "desert", "sunny", or "shady"
+    let iconMatch: String?         // a PlantSpecies raw value, or "other"
+    let flowers: Bool?             // whether this kind of plant makes flowers
+    let flowerColor: String?       // a FlowerColor raw value, or "none"
 
     enum CodingKeys: String, CodingKey {
         case isPlant = "is_plant"
@@ -38,6 +41,9 @@ nonisolated struct PlantInfo: Codable, Equatable {
         case safetyNote = "safety_note"
         case message
         case gardenPlot = "garden_plot"
+        case iconMatch = "icon_match"
+        case flowers
+        case flowerColor = "flower_color"
     }
 }
 
@@ -244,6 +250,23 @@ struct PlantIdentifier {
                 "description": "Which garden bed fits this plant's needs best. 'desert': needs little water and lots of sun "
                     + "(cacti, succulents, drought-tolerant plants). 'sunny': wants full sun and regular water. "
                     + "'shady': prefers shade, partial shade, or indirect light."
+            ],
+            "icon_match": [
+                "type": "string",
+                "enum": PlantSpecies.allCases.filter { $0 != .other }.map(\.rawValue) + ["other"],
+                "description": "Which garden icon fits this plant. Pick a plant only if it really is that kind of plant: "
+                    + "'coconut_palm' is only for coconut palms (not other palms), 'bush' is for berry bushes like "
+                    + "blueberry, raspberry, or blackberry, 'succulent' is for non-cactus succulents like echeveria, "
+                    + "aloe, or jade plant, and 'grass' is for lawn and wild grasses (not corn). "
+                    + "Use 'other' for everything else, and if is_plant is false."
+            ],
+            "flowers": prop("boolean", "True if this kind of plant grows flowers that are easy to see. "
+                + "False for ferns, mosses, conifers, and plants whose flowers are tiny or hidden."),
+            "flower_color": [
+                "type": "string",
+                "enum": FlowerColor.allCases.map(\.rawValue) + ["none"],
+                "description": "The main color of this plant's flowers: the color in the photo if it is blooming, "
+                    + "otherwise its most common flower color. 'none' if it doesn't grow flowers."
             ]
         ]
 
@@ -251,7 +274,8 @@ struct PlantIdentifier {
             "type": "object",
             "properties": properties,
             "required": ["is_plant", "common_name", "scientific_name", "confidence", "summary",
-                         "fun_fact", "where_it_grows", "needs", "dangers", "safety_note", "message", "garden_plot"]
+                         "fun_fact", "where_it_grows", "needs", "dangers", "safety_note", "message", "garden_plot",
+                         "icon_match", "flowers", "flower_color"]
         ]
     }
 }

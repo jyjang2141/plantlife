@@ -99,8 +99,14 @@ enum BugRules {
 extension GardenPlant {
     var hasCaterpillar: Bool { caterpillarSince != nil }
 
-    /// Seedlings have no flowers yet, so bees and butterflies skip them.
-    var hasFlowers: Bool { growth >= 1 }
+    /// Whether this plant ever makes flowers (ferns, grass, pines and the like never do).
+    var makesFlowers: Bool { stages.contains(.flowering) }
+
+    /// Bees and butterflies only visit plants that have reached their flowering stage (or later).
+    var hasFlowers: Bool {
+        guard let flowering = stages.firstIndex(of: .flowering) else { return false }
+        return growth >= flowering
+    }
 
     func hasLadybug(at date: Date = .now) -> Bool {
         (ladybugUntil ?? .distantPast) > date
@@ -175,7 +181,7 @@ extension GardenPlant {
     func pollinate(at date: Date = .now) {
         lastPollinated = date
         timesPollinated += 1
-        if growth < GardenPlant.maxGrowth { pollenBoost = true }
+        if growth < maxGrowth { pollenBoost = true }
     }
 }
 
@@ -292,7 +298,7 @@ struct PlantWithBugs: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            PlantSprite(kind: plant.kind, growth: plant.growth, droopy: droopy, size: size, holes: plant.leafHoles)
+            PlantSprite(plant: plant, droopy: droopy, size: size, holes: plant.leafHoles)
             ForEach(plant.bugs(at: now)) { kind in
                 let bugSize = Self.bugSize(kind, on: plant, size: size)
                 LiveBug(kind: kind)
@@ -348,16 +354,23 @@ struct PlantWithBugs: View {
     // MARK: Where bugs sit
 
     /// Where each bug sits, in the plant's 80 x 80 drawing box.
-    static func perchSpot(_ bug: BugKind, kind: PlantKind, growth: Int) -> CGPoint {
+    /// Sunflowers and cacti keep their hand-placed spots once grown; every other icon uses
+    /// one set of spots per stage that climbs as the plant gets taller.
+    static func perchSpot(_ bug: BugKind, species: PlantSpecies, stage: GrowthStage) -> CGPoint {
         let spots: (caterpillar: CGPoint, ladybug: CGPoint, flower: CGPoint)
-        if growth == 0 {
-            spots = (CGPoint(x: 31, y: 55), CGPoint(x: 51, y: 54), CGPoint(x: 40, y: 48))
-        } else {
-            switch kind {
-            case .sunflower: spots = (CGPoint(x: 29, y: 57), CGPoint(x: 52, y: 48), CGPoint(x: 44, y: 21))
-            case .cactus:    spots = (CGPoint(x: 25, y: 50), CGPoint(x: 55, y: 36), CGPoint(x: 41, y: 16))
-            case .standard:  spots = (CGPoint(x: 29, y: 52), CGPoint(x: 50, y: 45), CGPoint(x: 40, y: 24))
-            }
+        switch (species, stage) {
+        case (_, .sprout):
+            spots = (CGPoint(x: 33, y: 66), CGPoint(x: 48, y: 65), CGPoint(x: 40, y: 60))
+        case (_, .seedling):
+            spots = (CGPoint(x: 31, y: 58), CGPoint(x: 50, y: 52), CGPoint(x: 40, y: 46))
+        case (.sunflower, _):
+            spots = (CGPoint(x: 29, y: 57), CGPoint(x: 52, y: 48), CGPoint(x: 44, y: 21))
+        case (.cactus, _):
+            spots = (CGPoint(x: 25, y: 50), CGPoint(x: 55, y: 36), CGPoint(x: 41, y: 16))
+        case (_, .vegetating):
+            spots = (CGPoint(x: 30, y: 54), CGPoint(x: 50, y: 44), CGPoint(x: 40, y: 30))
+        default:
+            spots = (CGPoint(x: 29, y: 52), CGPoint(x: 50, y: 42), CGPoint(x: 40, y: 22))
         }
         switch bug {
         case .caterpillar:     return spots.caterpillar
@@ -368,21 +381,25 @@ struct PlantWithBugs: View {
 
     /// Where a bug sits in a `size` x `size` plant drawing, following the plant's growth, droop and wilt.
     static func perch(_ bug: BugKind, on plant: GardenPlant, droopy: Bool, size: CGFloat) -> CGPoint {
-        let spot = perchSpot(bug, kind: plant.kind, growth: plant.growth)
+        let spot = perchSpot(bug, species: plant.species, stage: plant.stage)
         let unit = size / 80
-        let scale = PlantSprite.growthScale(plant.growth)
         // Measured from the bottom middle, which is where the plant tips over from.
         let dx = (spot.x - 40) * unit
         let dy = -(80 - spot.y) * unit * PlantSprite.squash(holes: plant.leafHoles)
         let angle = PlantSprite.lean(droopy: droopy, holes: plant.leafHoles) * .pi / 180
         let x = dx * CGFloat(cos(angle)) - dy * CGFloat(sin(angle))
         let y = dx * CGFloat(sin(angle)) + dy * CGFloat(cos(angle))
-        return CGPoint(x: size / 2 + x * scale, y: size + y * scale)
+        return CGPoint(x: size / 2 + x, y: size + y)
     }
 
     static func bugSize(_ bug: BugKind, on plant: GardenPlant, size: CGFloat) -> CGFloat {
-        // Smaller on seedlings, so a caterpillar doesn't dwarf two little leaves.
-        (bug == .caterpillar ? 26 : 22) * size / 80 * PlantSprite.growthScale(plant.growth) * (plant.growth == 0 ? 0.75 : 1)
+        // Smaller on sprouts and seedlings, so a caterpillar doesn't dwarf two little leaves.
+        let shrink: CGFloat = switch plant.stage {
+        case .sprout:   0.7
+        case .seedling: 0.85
+        default:        1
+        }
+        return (bug == .caterpillar ? 26 : 22) * size / 80 * shrink
     }
 }
 
