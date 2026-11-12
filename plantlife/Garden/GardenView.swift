@@ -1,230 +1,216 @@
-//
-//  GardenView.swift
-//  plantlife
-//
-//  The Garden tab: one card per bed. Tap a bed to open it full screen.
-//
-
 import SwiftUI
 import SwiftData
 
-// MARK: - One garden, split into beds by what plants need
-
 struct GardenView: View {
     @Binding var selectedTab: Int
-
+    @Environment(\.modelContext) private var context
     @Query(sort: \GardenPlant.datePlanted) private var plants: [GardenPlant]
-
     @State private var now = Date.now
-    @State private var openBed: GardenPlot?
+    @State private var selectedPlant: GardenPlant?
+    @State private var currentArea: Int? = 1
+
+    private let areas: [GardenPlot] = [.desert, .sunny, .shady]
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if plants.isEmpty {
-                    ContentUnavailableView {
-                        Label("Your garden is empty", systemImage: "leaf")
-                    } description: {
-                        Text("Scan a plant on Discover, then plant it from its Journal page.")
-                    } actions: {
-                        Button("Go to Discover") { selectedTab = 1 }
-                            .buttonStyle(.borderedProminent).tint(.green)
-                    }
-                } else {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 14) {
-                            Text(statusLine)
-                                .font(.title3)
-                                .foregroundStyle(.secondary)
-                            beds
+        GeometryReader { geometry in
+            let width = geometry.size.width
+            let height = geometry.size.height
+            ZStack {
+                Color(red: 0.56, green: 0.74, blue: 0.39).ignoresSafeArea()
+                ScrollView(.horizontal) {
+                    HStack(spacing: 0) {
+                        ForEach(Array(areas.enumerated()), id: \.offset) { index, area in
+                            GardenClearing(
+                                area: area,
+                                plants: plants.filter { $0.plot == area },
+                                now: now,
+                                size: CGSize(width: width, height: height),
+                                select: { selectedPlant = $0 },
+                                findPlant: { selectedTab = 1 }
+                            )
+                            .frame(width: width, height: height)
+                            .id(index)
                         }
-                        .padding()
                     }
+                    .scrollTargetLayout()
                 }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.green.opacity(0.07))
-            .navigationTitle("My Garden")
-            // Re-checks every few seconds so plants get thirsty, and caterpillars come and chew, on their own.
-            .task {
-                while !Task.isCancelled {
-                    BugRules.update(plants)
-                    now = .now
-                    try? await Task.sleep(for: .seconds(5))
+                .scrollIndicators(.hidden)
+                // Continuous scrolling: clearings are landmarks, not snapping pages.
+                .scrollPosition(id: $currentArea, anchor: .center)
+
+                VStack {
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("My little garden").font(.system(.title2, design: .rounded).bold())
+                            Label("Drag to explore", systemImage: "hand.draw")
+                                .font(.subheadline)
+                        }
+                        .padding(14)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22))
+                        Spacer()
+                        Button { selectedTab = 1 } label: {
+                            Image(systemName: "camera.fill")
+                                .font(.title2).padding(17)
+                                .background(.regularMaterial, in: Circle())
+                        }
+                        .accessibilityLabel("Discover a new plant")
+                        Menu {
+                            Button("My journal", systemImage: "book") { selectedTab = 2 }
+                            Button("Learn", systemImage: "sparkles") { selectedTab = 3 }
+                        } label: {
+                            Image(systemName: "backpack.fill")
+                                .font(.title2).padding(17)
+                                .background(.regularMaterial, in: Circle())
+                        }
+                        .accessibilityLabel("Open journal and learning menu")
+                    }
+                    Spacer()
+                    if plants.isEmpty {
+                        Button { selectedTab = 1 } label: {
+                            Label("Find a plant for your garden", systemImage: "plus.circle.fill")
+                                .font(.headline).padding(14)
+                                .background(.regularMaterial, in: Capsule())
+                        }
+                    }
+                    HStack(spacing: 10) {
+                        ForEach(Array(areas.enumerated()), id: \.offset) { index, area in
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.7)) { currentArea = index }
+                            } label: {
+                                Text(area.emoji).font(.title2)
+                                    .frame(width: 48, height: 44)
+                                    .background(currentArea == index ? Color.white.opacity(0.85) : .clear, in: RoundedRectangle(cornerRadius: 14))
+                            }
+                            .accessibilityLabel("Visit " + area.title)
+                        }
+                    }
+                    .padding(10)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 25))
                 }
-            }
-            .fullScreenCover(item: $openBed) { bed in
-                BedView(bed: bed) {
-                    // "Open plot" was tapped: close the bed and go find a plant.
-                    openBed = nil
-                    selectedTab = 1
-                }
+                .padding(16)
+                .foregroundStyle(Color(red: 0.15, green: 0.27, blue: 0.15))
             }
         }
-    }
-
-    private var beds: some View {
-        VStack(spacing: 14) {
-            HStack {
-                Text("Tap a bed to visit it")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Image(systemName: "sun.max.fill")
-                    .font(.system(size: 42))
-                    .foregroundStyle(.yellow)
-                    .accessibilityHidden(true)
-            }
-
-            ForEach(GardenPlot.allCases) { bed in
-                Button {
-                    openBed = bed
-                } label: {
-                    BedCard(bed: bed, plants: plants.filter { $0.plot == bed }, now: now)
-                }
-                .buttonStyle(.plain)
-                .accessibilityHint("Opens this bed")
+        .task {
+            while !Task.isCancelled {
+                BugRules.update(plants)
+                now = .now
+                do { try await Task.sleep(for: .seconds(5)) }
+                catch { break }
             }
         }
-        .padding(14)
-        .background(
-            LinearGradient(colors: [Color.cyan.opacity(0.28), Color.green.opacity(0.16)],
-                           startPoint: .top, endPoint: .bottom),
-            in: RoundedRectangle(cornerRadius: 28)
-        )
-    }
-
-    private var statusLine: String {
-        let caterpillars = plants.filter(\.hasCaterpillar).count
-        if caterpillars > 0 {
-            return caterpillars == 1
-                ? "A caterpillar is chewing leaves! Open its bed to move it."
-                : "\(caterpillars) caterpillars are chewing leaves! Open their beds to move them."
-        }
-        let thirsty = plants.filter { $0.isThirsty(at: now) }.count
-        switch thirsty {
-        case 0:  return "Everyone is happy! Check back soon."
-        case 1:  return "1 plant is thirsty. Open its bed to water it!"
-        default: return "\(thirsty) plants are thirsty. Open their beds to water them!"
+        .fullScreenCover(item: $selectedPlant) { plant in
+            GardenPlantDetailView(plant: plant) {
+                selectedPlant = nil
+                context.delete(plant)
+                try? context.save()
+            }
         }
     }
 }
 
-// MARK: - One bed's card
-
-private struct BedCard: View {
-    let bed: GardenPlot
+private struct GardenClearing: View {
+    let area: GardenPlot
     let plants: [GardenPlant]
     let now: Date
+    let size: CGSize
+    let select: (GardenPlant) -> Void
+    let findPlant: () -> Void
 
-    private var thirstyCount: Int { plants.filter { $0.isThirsty(at: now) }.count }
-    private var caterpillarCount: Int { plants.filter(\.hasCaterpillar).count }
-    private static let previewLimit = 6
+    private var ground: Color {
+        switch area {
+        case .desert: Color(red: 0.85, green: 0.75, blue: 0.49)
+        case .sunny: Color(red: 0.64, green: 0.80, blue: 0.43)
+        case .shady: Color(red: 0.39, green: 0.62, blue: 0.41)
+        }
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                Image(systemName: bed.symbol)
-                    .font(.title2)
-                    .foregroundStyle(bed.tint)
-                    .frame(width: 44, height: 44)
-                    .background(bed.tint.opacity(0.18), in: RoundedRectangle(cornerRadius: 12))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(bed.title).font(.headline)
-                    Text("\(plants.count) of \(GardenPlot.plotCount) plots")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                if caterpillarCount > 0 {
-                    HStack(spacing: 2) {
-                        BugSprite(kind: .caterpillar).frame(width: 22, height: 22)
-                        Text("\(caterpillarCount)").font(.caption.bold()).foregroundStyle(.orange)
-                    }
-                }
-                if thirstyCount > 0 {
-                    Label("\(thirstyCount) thirsty", systemImage: "drop")
-                        .font(.caption.bold()).foregroundStyle(.orange)
-                } else if !plants.isEmpty {
-                    Label("Happy", systemImage: "drop.fill")
-                        .font(.caption.bold()).foregroundStyle(.blue)
-                }
-                Image(systemName: "chevron.right")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-            }
-
-            HStack(spacing: 12) {
-                Label(bed.sunlight, systemImage: "sun.max.fill")
-                Label(bed.climate, systemImage: "thermometer.medium")
-                Label(bed.wateringLabel, systemImage: "drop.fill")
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-
-            soilStrip
-        }
-        .padding(12)
-        .background(Theme.card.opacity(0.75), in: RoundedRectangle(cornerRadius: 22))
-        .contentShape(RoundedRectangle(cornerRadius: 22))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(bed.title). \(plants.count) of \(GardenPlot.plotCount) plots used, \(thirstyCount) thirsty"
-                            + (caterpillarCount > 0 ? ", \(caterpillarCount) with caterpillars" : "")
-                            + ". \(bed.sunlight), \(bed.climate).")
-    }
-
-    /// A little peek at the soil and the plants growing in it.
-    private var soilStrip: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 16)
-                .fill(thirstyCount > 0 ? bed.drySoil : bed.wetSoil)
-            if bed == .shady {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(LinearGradient(colors: [.black.opacity(0.25), .clear],
-                                         startPoint: .topTrailing, endPoint: .bottomLeading))
+            LinearGradient(colors: [ground.opacity(0.7), ground], startPoint: .top, endPoint: .bottom)
+            // The path crosses every clearing at the same height to join the world.
+            Rectangle()
+                .fill(Color(red: 0.88, green: 0.80, blue: 0.60))
+                .frame(height: 65)
+                .position(x: size.width / 2, y: size.height * 0.77)
+            ForEach(0..<14, id: \.self) { index in
+                Ellipse().fill(.white.opacity(0.20))
+                    .frame(width: 16, height: 7)
+                    .position(x: CGFloat(index) * size.width / 13, y: size.height * 0.77 + (index.isMultiple(of: 2) ? 14 : -14))
             }
-
-            if plants.isEmpty {
-                Text(bed.emptyHint)
-                    .font(.footnote)
-                    .foregroundStyle(bed.textOnSoil.opacity(0.85))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            } else {
-                HStack(alignment: .bottom, spacing: 2) {
-                    ForEach(Array(plants.prefix(Self.previewLimit))) { plant in
-                        PlantWithBugs(plant: plant, droopy: plant.isThirsty(at: now), size: 44, now: now)
-                    }
-                    Spacer(minLength: 4)
-                    Text(extraText)
-                        .font(.caption)
-                        .foregroundStyle(bed.textOnSoil.opacity(0.85))
-                        .padding(.bottom, 6)
+            TimelineView(.animation(minimumInterval: 1.0 / 20)) { timeline in
+                let phase = timeline.date.timeIntervalSinceReferenceDate
+                ZStack {
+                    Text(area == .shady ? "🌳" : area == .desert ? "🏜️" : "🌻")
+                        .font(.system(size: min(size.width * 0.20, 120)))
+                        .rotationEffect(.degrees(sin(phase * 0.7) * 2))
+                        .position(x: size.width * 0.80, y: size.height * 0.23)
+                    Text("🦋").font(.system(size: 27))
+                        .position(x: size.width * 0.23 + sin(phase * 0.4) * 40,
+                                  y: size.height * 0.31 + cos(phase * 0.7) * 17)
                 }
-                .padding(.horizontal, 10)
-                .padding(.bottom, 4)
-                .frame(maxHeight: .infinity, alignment: .bottom)
+                .accessibilityHidden(true)
+                .allowsHitTesting(false)
             }
-        }
-        .frame(height: 72)
-        .animation(.easeInOut(duration: 0.5), value: thirstyCount > 0)
-    }
+            Text(area.title)
+                .font(.system(.title2, design: .rounded).bold())
+                .foregroundStyle(Color(red: 0.30, green: 0.20, blue: 0.12))
+                .padding(.horizontal, 22).padding(.vertical, 12)
+                .background(Color(red: 0.96, green: 0.88, blue: 0.67), in: RoundedRectangle(cornerRadius: 9))
+                .rotationEffect(.degrees(-3))
+                .position(x: size.width * 0.36, y: size.height * 0.24)
 
-    private var extraText: String {
-        if plants.count > Self.previewLimit { return "+\(plants.count - Self.previewLimit) more" }
-        let open = max(0, GardenPlot.plotCount - plants.count)
-        return open == 1 ? "1 open plot" : "\(open) open plots"
+            ZStack {
+                    RoundedRectangle(cornerRadius: 36)
+                        .fill(Color(red: 0.48, green: 0.30, blue: 0.17))
+                        .shadow(color: .black.opacity(0.22), radius: 0, y: 9)
+                    RoundedRectangle(cornerRadius: 28)
+                        .fill(area.drySoil)
+                        .padding(10)
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 5) {
+                        ForEach(Array(GardenPlant.arrange(plants).enumerated()), id: \.offset) { _, plant in
+                            if let plant {
+                                Button { select(plant) } label: {
+                                VStack(spacing: 0) {
+                                    PlantWithBugs(plant: plant, droopy: plant.isThirsty(at: now), size: 48, now: now)
+                                        .allowsHitTesting(false)
+                                    if plant.isThirsty(at: now) {
+                                        Text("💧").font(.caption)
+                                    }
+                                }
+                                .frame(height: 62)
+                                .frame(maxWidth: .infinity)
+                                .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Care for " + plant.name)
+                            } else {
+                                Button(action: findPlant) {
+                                Ellipse().fill(.black.opacity(0.13))
+                                    .frame(width: 34, height: 15)
+                                    .frame(height: 62)
+                                    .frame(maxWidth: .infinity)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Find a plant for this empty spot")
+                            }
+                        }
+                    }
+                    .padding(18)
+            }
+            .frame(width: min(size.width * 0.78, 520), height: min(size.height * 0.37, 280))
+            .position(x: size.width / 2, y: size.height * 0.51)
+
+            Text("Tap a plant to care for it")
+                .font(.system(.subheadline, design: .rounded).bold())
+                .foregroundStyle(Color(red: 0.21, green: 0.28, blue: 0.15))
+                .position(x: size.width / 2, y: size.height * 0.73)
+        }
     }
 }
 
 #Preview {
-    let container = try! ModelContainer(
-        for: JournalEntry.self, GardenPlant.self,
-        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-    )
-    container.mainContext.insert(GardenPlant(name: "Sunflower", kind: .sunflower, plot: .sunny))
-    container.mainContext.insert(GardenPlant(name: "Barrel Cactus", kind: .cactus, plot: .desert))
-    container.mainContext.insert(GardenPlant(name: "Ice Plant", kind: .standard, plot: .desert))
-    container.mainContext.insert(GardenPlant(name: "Fern", kind: .standard, plot: .shady))
-    return GardenView(selectedTab: .constant(0)).modelContainer(container)
+    GardenView(selectedTab: .constant(0))
+        .modelContainer(for: [JournalEntry.self, GardenPlant.self], inMemory: true)
 }

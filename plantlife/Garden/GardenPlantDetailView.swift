@@ -15,6 +15,7 @@ struct GardenPlantDetailView: View {
     let onRemove: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
     @Query private var journalEntries: [JournalEntry]
     @State private var confirmRemove = false
     @State private var detent: PresentationDetent = .large
@@ -22,6 +23,9 @@ struct GardenPlantDetailView: View {
     /// A helper bug (ladybug, bee, butterfly) the kid dragged off; asks "are you sure?".
     @State private var helperToRemove: BugKind?
     @State private var notice: String?
+    @State private var canPoint: CGPoint?
+    @State private var isWatering = false
+    @State private var wateringProgress = 0.0
 
     /// The journal page saved at the same moment this plant was planted.
     private var journalEntry: JournalEntry? {
@@ -46,7 +50,7 @@ struct GardenPlantDetailView: View {
                     }
                     .padding(20)
                 }
-                .scrollDisabled(draggingBug)
+                .scrollDisabled(draggingBug || canPoint != nil)
             }
             .background(Theme.background)
             .navigationTitle(plant.name)
@@ -70,6 +74,26 @@ struct GardenPlantDetailView: View {
                 try? await Task.sleep(for: .seconds(4))
                 withAnimation { notice = nil }
             }
+            .task(id: isWatering) {
+                guard isWatering else { return }
+                while !Task.isCancelled && plant.isThirsty() {
+                    do { try await Task.sleep(for: .milliseconds(100)) }
+                    catch { return }
+                    guard !Task.isCancelled else { return }
+                    wateringProgress = min(1, wateringProgress + 0.025)
+                    if wateringProgress >= 1 {
+                        withAnimation {
+                            plant.water()
+                            notice = "A lovely drink! Your plant feels better."
+                        }
+                        try? context.save()
+                        isWatering = false
+                        wateringProgress = 0
+                        canPoint = nil
+                        return
+                    }
+                }
+            }
             .confirmationDialog("Remove \(plant.name) from your garden?",
                                 isPresented: $confirmRemove, titleVisibility: .visible) {
                 Button("Remove", role: .destructive) { onRemove() }
@@ -87,7 +111,7 @@ struct GardenPlantDetailView: View {
     private func header(now: Date) -> some View {
         let thirsty = plant.isThirsty(at: now)
         return VStack(spacing: 10) {
-            closeup(now: now, thirsty: thirsty)
+            plantCare(now: now, thirsty: thirsty)
 
             if let notice {
                 Label(notice, systemImage: "checkmark.circle.fill")
@@ -105,7 +129,7 @@ struct GardenPlantDetailView: View {
                 .font(.headline)
 
             if thirsty {
-                Label("Thirsty! Drag the watering can onto it in the \(plant.plot.title).", systemImage: "drop")
+                Label("Thirsty! Drag the watering can onto your plant.", systemImage: "drop")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.orange)
                     .multilineTextAlignment(.center)
@@ -113,6 +137,55 @@ struct GardenPlantDetailView: View {
                 Label("Happy. Thirsty again in \(timeLeft(now: now)).", systemImage: "drop.fill")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.blue)
+            }
+        }
+    }
+
+    private func plantCare(now: Date, thirsty: Bool) -> some View {
+        VStack(spacing: 8) {
+            GeometryReader { geometry in
+                ZStack(alignment: .top) {
+                    closeup(now: now, thirsty: thirsty)
+                    if thirsty {
+                        let point = canPoint ?? CGPoint(x: geometry.size.width * 0.82, y: 279)
+                        WateringCan()
+                            .frame(width: 66, height: 66)
+                            .overlay(alignment: .topLeading) {
+                                if isWatering {
+                                    WaterDrops().frame(width: 38, height: 66).offset(x: -20, y: 22)
+                                }
+                            }
+                            .position(point)
+                            .gesture(
+                                DragGesture(coordinateSpace: .named("plantCare"))
+                                    .onChanged { value in
+                                        canPoint = value.location
+                                        let target = CGRect(x: geometry.size.width * 0.15, y: 20,
+                                                            width: geometry.size.width * 0.7, height: 216)
+                                        isWatering = target.contains(value.location)
+                                    }
+                                    .onEnded { _ in
+                                        canPoint = nil
+                                        isWatering = false
+                                    }
+                            )
+                            .accessibilityLabel("Watering can. Drag over your plant")
+                    }
+                }
+                .coordinateSpace(name: "plantCare")
+            }
+            .frame(height: thirsty ? 320 : 236)
+            if thirsty {
+                ProgressView(value: wateringProgress).tint(Theme.water)
+                Button("Water my plant") {
+                    plant.water()
+                    wateringProgress = 0
+                    isWatering = false
+                    canPoint = nil
+                    notice = "A lovely drink! Your plant feels better."
+                    try? context.save()
+                }
+                .accessibilityHint("An alternative to dragging the watering can")
             }
         }
     }
