@@ -119,7 +119,10 @@ struct GardenPlantDetailView: View {
                     .foregroundStyle(Theme.leaf)
                     .multilineTextAlignment(.center)
                     .transition(.opacity)
-            } else if !plant.bugs(at: now).isEmpty {
+            }
+            // Stays up as long as a bug is on the plant, even while a notice (like
+            // "A lovely drink!" after watering) is showing.
+            if !plant.bugs(at: now).isEmpty {
                 Label("Drag a bug off the plant to move it away.", systemImage: "hand.draw")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -170,6 +173,9 @@ struct GardenPlantDetailView: View {
                                     }
                             )
                             .accessibilityLabel("Watering can. Drag over your plant")
+                            // The closeup uses zIndex 1 (so dragged bugs float over the cards);
+                            // the can must sit above it, or it slides behind the soil.
+                            .zIndex(2)
                     }
                 }
                 .coordinateSpace(name: "plantCare")

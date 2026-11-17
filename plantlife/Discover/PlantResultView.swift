@@ -94,28 +94,12 @@ struct PlantResultView: View {
                     .italic()
                     .opacity(0.9)
             }
-
-            Text(confidenceText)
-                .font(.system(.footnote, design: .rounded, weight: .semibold))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Color.white.opacity(0.22))
-                .clipShape(Capsule())
-                .padding(.top, 6)
         }
         .foregroundStyle(Color.white)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
         .background(Theme.leaf)
         .clipShape(Theme.cardShape)
-    }
-
-    private var confidenceText: String {
-        switch info.confidence {
-        case "high":   return "I'm pretty sure about this one"
-        case "medium": return "I think this is right"
-        default:       return "Not sure. Try a closer photo of a leaf or flower"
-        }
     }
 
     // MARK: Not a plant

@@ -627,7 +627,7 @@ private struct SoilPatch: View {
             let w = size.width, h = size.height
             let patch = Path(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 26)
             let center = CGPoint(x: w / 2, y: h * 0.55)
-            let dirt = Color(red: 0.30, green: 0.20, blue: 0.12)   // fresh, darker dug-up dirt
+            let dirt = bed.dugSoil   // fresh dug-up dirt, a bit darker than the bed
 
             // Soil
             context.fill(patch, with: .color(bed.drySoil))

@@ -11,10 +11,12 @@ import SwiftData
 struct PlantLifeHome: View {
     @State private var selectedTab = 0   // the garden is home
     @State private var journalPath: [JournalEntry] = []
+    /// Which garden clearing is centered (index into `GardenView.areas`). Starts on the Sunny Bed.
+    @State private var gardenArea: Int? = 1
 
     var body: some View {
         ZStack {
-            GardenView(selectedTab: $selectedTab)
+            GardenView(selectedTab: $selectedTab, currentArea: $gardenArea)
                 .opacity(selectedTab == 0 ? 1 : 0)
                 .allowsHitTesting(selectedTab == 0)
                 .accessibilityHidden(selectedTab != 0)
@@ -43,7 +45,25 @@ struct PlantLifeHome: View {
             }
         }
         .tint(.green)
+        .environment(\.goToGarden, GoToGardenAction { bed in
+            journalPath = []
+            selectedTab = 0
+            if let bed, let index = GardenView.areas.firstIndex(of: bed) {
+                gardenArea = index
+            }
+        })
     }
+}
+
+/// Closes Discover/Journal/Learn and returns to the garden, optionally scrolled to one bed.
+/// Used after planting so the kid lands right where their new plant is growing.
+struct GoToGardenAction {
+    let action: (GardenPlot?) -> Void
+    func callAsFunction(_ bed: GardenPlot? = nil) { action(bed) }
+}
+
+extension EnvironmentValues {
+    @Entry var goToGarden = GoToGardenAction { _ in }
 }
 
 #Preview {

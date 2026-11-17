@@ -7,6 +7,7 @@ import SwiftData
 struct JournalEntryDetailView: View {
     @Bindable var entry: JournalEntry
     @Environment(\.modelContext) private var context
+    @Environment(\.goToGarden) private var goToGarden
     @State private var saveFailed = false
     /// A second try at the bed question, for kids whose first guess was wrong.
     @State private var retryGuess: GardenPlot?
@@ -24,7 +25,11 @@ struct JournalEntryDetailView: View {
         .navigationTitle(entry.observationsCompleted ? entry.name : "New plant")
         .navigationBarTitleDisplayMode(.inline)
         .onDisappear { saveAnswers() }
-        .fullScreenCover(isPresented: $showPlanting) {
+        .fullScreenCover(isPresented: $showPlanting, onDismiss: {
+            // Planted it? Head back to the garden to see it growing in its bed.
+            // (Closing the planting screen early keeps you on this page.)
+            if entry.plantedInGarden { goToGarden(entry.correctTerrain) }
+        }) {
             if let bed = entry.correctTerrain {
                 PlantingView(entry: entry, bed: bed)
             }

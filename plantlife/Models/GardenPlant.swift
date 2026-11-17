@@ -107,6 +107,16 @@ enum GardenPlot: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    /// Freshly dug dirt (the pile beside the hole, and the mound over the seed):
+    /// a few shades darker than each bed's own soil so it stands out.
+    var dugSoil: Color {
+        switch self {
+        case .desert: Color(red: 0.68, green: 0.52, blue: 0.30)
+        case .sunny:  Color(red: 0.45, green: 0.31, blue: 0.19)
+        case .shady:  Color(red: 0.16, green: 0.10, blue: 0.06)
+        }
+    }
+
     /// Light sand needs dark text; dark soil needs white text.
     var textOnSoil: Color { self == .desert ? Color(red: 0.35, green: 0.22, blue: 0.08) : .white }
 

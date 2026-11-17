@@ -7,9 +7,11 @@ struct GardenView: View {
     @Query(sort: \GardenPlant.datePlanted) private var plants: [GardenPlant]
     @State private var now = Date.now
     @State private var selectedPlant: GardenPlant?
-    @State private var currentArea: Int? = 1
+    /// Which clearing is centered. Owned by `PlantLifeHome` so other screens can send the kid to a bed.
+    @Binding var currentArea: Int?
 
-    private let areas: [GardenPlot] = [.desert, .sunny, .shady]
+    static let areas: [GardenPlot] = [.desert, .sunny, .shady]
+    private var areas: [GardenPlot] { Self.areas }
 
     var body: some View {
         GeometryReader { geometry in
@@ -211,6 +213,6 @@ private struct GardenClearing: View {
 }
 
 #Preview {
-    GardenView(selectedTab: .constant(0))
+    GardenView(selectedTab: .constant(0), currentArea: .constant(1))
         .modelContainer(for: [JournalEntry.self, GardenPlant.self], inMemory: true)
 }
