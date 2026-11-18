@@ -1,149 +1,122 @@
-//
-//  PlantingView.swift
-//  plantlife
-//
-//  Planting a new plant in the Garden, opened from its Journal page once the kid
-//  knows which bed it belongs in:
-//    1. pick an open plot in that bed
-//    2. dig a hole, drop in the seed, cover it with soil, and water it
-//
-
 import SwiftUI
 import SwiftData
-
-// MARK: - The whole flow
 
 struct PlantingView: View {
     let entry: JournalEntry
     let bed: GardenPlot
-
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \GardenPlant.datePlanted) private var allPlants: [GardenPlant]
-    @State private var chosenSlot: Int?
+    @State private var chosenPosition: CGPoint?
+    @State private var placementSize = GardenLayout.referenceSize
 
     var body: some View {
+        let plants = allPlants.filter { $0.plot == bed }
         ZStack {
-            ZStack {
-                Theme.background
-                LinearGradient(colors: [Color.cyan.opacity(0.28), Color.green.opacity(0.16)],
-                               startPoint: .top, endPoint: .bottom)
-            }
-            .ignoresSafeArea()
-
-            if let chosenSlot {
-                PlantingActivity(entry: entry, bed: bed, slot: chosenSlot,
-                                 onBack: { withAnimation(.spring(duration: 0.5)) { self.chosenSlot = nil } },
+            Theme.background.ignoresSafeArea()
+            if let position = chosenPosition {
+                PlantingActivity(entry: entry, bed: bed,
+                                 slot: (0..<GardenPlot.plotCount).first { slot in !plants.contains { $0.slot == slot } } ?? 0,
+                                 position: position,
+                                 placementSize: placementSize,
+                                 onBack: { chosenPosition = nil },
                                  onClose: { dismiss() })
-                    .transition(.scale(scale: 0.6).combined(with: .opacity))
             } else {
-                PlotPicker(entry: entry, bed: bed,
-                           plots: GardenPlant.arrange(allPlants.filter { $0.plot == bed }),
-                           onPick: { slot in withAnimation(.spring(duration: 0.5)) { chosenSlot = slot } },
-                           onClose: { dismiss() })
-                    .transition(.opacity)
+                FreePlantPicker(entry: entry, bed: bed, plants: plants,
+                                onPick: { position, size in
+                                    placementSize = size
+                                    chosenPosition = position
+                                }, onClose: { dismiss() })
             }
         }
     }
 }
 
-// MARK: - Step 0: pick a plot
-
-private struct PlotPicker: View {
+/// The same full-screen scene as the garden, with a continuous placement map.
+private struct FreePlantPicker: View {
     let entry: JournalEntry
     let bed: GardenPlot
-    /// Index = plot number, nil = open.
-    let plots: [GardenPlant?]
-    let onPick: (Int) -> Void
+    let plants: [GardenPlant]
+    let onPick: (CGPoint, CGSize) -> Void
     let onClose: () -> Void
-
-    @State private var glow = false
-
-    private var openCount: Int { plots.filter { $0 == nil }.count }
+    @State private var candidate: CGPoint?
+    @State private var feedback = "Touch anywhere on the green ground."
+    @State private var viewportSize = GardenLayout.referenceSize
+    private var full: Bool { plants.count >= GardenPlot.plotCount }
+    private var occupied: [CGPoint] { GardenLayout.positions(plants) }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    RoundIconButton(systemImage: "xmark", label: "Close", action: onClose)
-                    Spacer()
-                    Image(systemName: bed.symbol)
-                        .font(.system(size: 42))
-                        .foregroundStyle(bed.tint)
-                        .accessibilityHidden(true)
-                }
-                .padding(.top, 8)
-
-                Text(bed.title)
-                    .font(.largeTitle.bold())
-                    .accessibilityAddTraits(.isHeader)
-                Text(openCount > 0
-                     ? "Where should your \(entry.name) grow? Tap an open plot."
-                     : "The \(bed.title) is full! Remove a plant from it in the Garden to make room, then come back.")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
-                    ForEach(Array(plots.enumerated()), id: \.offset) { index, plant in
-                        if let plant {
-                            takenPlot(plant)
-                        } else {
-                            openPlot(index)
-                        }
+        VStack(spacing: 0) {
+            HStack {
+                Button(action: onClose) { Label("Close", systemImage: "xmark") }
+                Spacer()
+                Text(bed.title).font(.headline)
+            }
+            .padding(14)
+            GeometryReader { geometry in
+                ZStack {
+                    GardenGround(bed: bed, plants: plants, placement: true)
+                    Color.clear.contentShape(Rectangle())
+                        .gesture(DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                let point = CGPoint(x: value.location.x / geometry.size.width,
+                                                    y: value.location.y / geometry.size.height)
+                                candidate = point
+                                feedback = allowed(point) ? "This spot has room to grow!" : "Choose green ground, away from plants and scenery."
+                            })
+                    if let point = candidate {
+                        let valid = allowed(point)
+                        Circle().stroke(valid ? .green : .red, lineWidth: 4)
+                            .background((valid ? Color.green : Color.red).opacity(0.15), in: Circle())
+                            .overlay(Image(systemName: valid ? "checkmark" : "xmark").font(.title2.bold()).foregroundStyle(valid ? .green : .red))
+                            .frame(width: 52, height: 52)
+                            .position(x: point.x * geometry.size.width, y: point.y * geometry.size.height)
+                            .allowsHitTesting(false)
                     }
                 }
-                .bedFrame(bed)
+                .onGeometryChange(for: CGSize.self) { $0.size } action: { viewportSize = $0 }
             }
-            .padding(.horizontal)
-            .padding(.bottom, 30)
+            VStack(spacing: 8) {
+                Text(full ? "This garden has nine plants!" : "Where will your plant grow?")
+                    .font(.title3.bold())
+                Text(full ? "Make room before planting another." : feedback)
+                    .font(.subheadline).multilineTextAlignment(.center)
+                HStack {
+                    Label("Plant here", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    Label("Leave clear", systemImage: "xmark.circle.fill").foregroundStyle(.red)
+                }
+                .font(.caption.bold())
+                HStack(spacing: 18) {
+                    if !full {
+                        Button("Find an open spot") {
+                            candidate = suggestedPoint
+                            feedback = candidate == nil ? "Try another place on the green ground." : "This spot has room to grow!"
+                        }
+                    }
+                    Button("Plant here") {
+                        if let candidate, allowed(candidate) { onPick(candidate, viewportSize) }
+                    }
+                    .buttonStyle(.borderedProminent).tint(.green)
+                    .disabled(candidate.map { !allowed($0) } ?? true)
+                }
+            }
+            .padding(12)
         }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { glow = true }
-        }
+        .background(Theme.background)
     }
 
-    private func takenPlot(_ plant: GardenPlant) -> some View {
-        VStack(spacing: 2) {
-            PlantSprite(plant: plant, size: 60, holes: plant.leafHoles)
-                .frame(height: 70, alignment: .bottom)
-            Text(plant.displayName)
-                .font(.caption.weight(.semibold))
-                .lineLimit(1)
-        }
-        .foregroundStyle(bed.textOnSoil)
-        .padding(.horizontal, 4)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, minHeight: 116)
-        .background(bed.wetSoil, in: RoundedRectangle(cornerRadius: 16))
-        .opacity(0.55)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(plant.displayName) already grows here")
+    private func allowed(_ point: CGPoint) -> Bool {
+        !full && GardenLayout.isAllowed(point, bed: bed, occupied: occupied, size: viewportSize)
     }
 
-    private func openPlot(_ index: Int) -> some View {
-        Button {
-            onPick(index)
-        } label: {
-            VStack(spacing: 6) {
-                Image(systemName: "hand.tap.fill")
-                    .font(.title2)
-                Text("Plant here")
-                    .font(.caption.weight(.bold))
+    private var suggestedPoint: CGPoint? {
+        if let point = GardenLayout.fallbackPoints.first(where: allowed) { return point }
+        for row in 0..<18 {
+            for column in 0..<22 {
+                let point = CGPoint(x: 0.04 + Double(column) * 0.043, y: 0.04 + Double(row) * 0.054)
+                if allowed(point) { return point }
             }
-            .foregroundStyle(bed.textOnSoil)
-            .frame(maxWidth: .infinity, minHeight: 116)
-            .background(bed.drySoil, in: RoundedRectangle(cornerRadius: 16))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(Color.white.opacity(glow ? 0.95 : 0.35),
-                                  style: StrokeStyle(lineWidth: 2.5, dash: [7, 5]))
-            )
-            .shadow(color: .white.opacity(glow ? 0.5 : 0), radius: 8)
-            .scaleEffect(glow ? 1.03 : 1)
-            .contentShape(RoundedRectangle(cornerRadius: 16))
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Open plot \(index + 1)")
-        .accessibilityHint("Plant your \(entry.name) here")
+        return nil
     }
 }
 
@@ -153,6 +126,8 @@ private struct PlantingActivity: View {
     let entry: JournalEntry
     let bed: GardenPlot
     let slot: Int
+    let position: CGPoint
+    let placementSize: CGSize
     let onBack: () -> Void
     let onClose: () -> Void
 
@@ -185,7 +160,10 @@ private struct PlantingActivity: View {
     /// Watering fills in about 2 seconds of holding.
     private let waterPerTick = 0.025
 
-    private var species: PlantSpecies { entry.info.map(PlantSpecies.match) ?? .other }
+    private var species: PlantSpecies {
+        guard let info = entry.info else { return .other }
+        return PlantSpecies.match(info)
+    }
     private var flowerColor: FlowerColor? { entry.info?.flowerColor.flatMap(FlowerColor.init(rawValue:)) }
 
     private var isPouring: Bool {
@@ -487,7 +465,11 @@ private struct PlantingActivity: View {
 
     private func finishPlanting() {
         guard step == .water else { return }
-        PlantRecorder.plant(entry, in: bed, slot: slot, context: context)
+        guard PlantRecorder.plant(entry, in: bed, slot: slot, position: position, placementSize: placementSize, context: context) else {
+            hint = "That spot isn't available. Let's choose another one."
+            onBack()
+            return
+        }
         advance(to: .done)
     }
 

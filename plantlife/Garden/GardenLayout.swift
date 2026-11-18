@@ -146,7 +146,7 @@ struct GardenGround: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(placement)
-                    .accessibilityLabel("Care for " + plant.name)
+                    .accessibilityLabel("Care for " + plant.displayName)
                     .position(x: point.x * size.width, y: point.y * size.height - spriteSize * 0.40)
                 }
             }

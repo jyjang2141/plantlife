@@ -169,6 +169,9 @@ final class GardenPlant {
     /// Which of the bed's 9 plots it's in (0 = top left, 8 = bottom right).
     /// -1 for plants planted before kids could pick a plot; they fill the first free plots.
     var slot: Int = -1
+    /// Normalized ground position, shared by the planting preview and garden.
+    var gardenX: Double = -1
+    var gardenY: Double = -1
 
     // Bugs (the rules are in Bugs.swift)
     /// When a caterpillar moved onto this plant. nil = no caterpillar.
