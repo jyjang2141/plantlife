@@ -337,10 +337,10 @@ struct BedView: View {
             progress[plant.persistentModelID] = 0
             now = .now
             message = switch result {
-            case .grew:      "\(plant.name) drank it all up and grew!"
-            case .grewExtra: "\(plant.name)'s pollinated flowers gave it a boost. It grew two stages!"
-            case .slowed:    "\(plant.name) drank it up, but its chewed leaves slow it down. It needs one more drink to grow."
-            case .happy:     "\(plant.name) is happy again!"
+            case .grew:      "\(plant.displayName) drank it all up and grew!"
+            case .grewExtra: "\(plant.displayName)'s pollinated flowers gave it a boost. It grew two stages!"
+            case .slowed:    "\(plant.displayName) drank it up, but its chewed leaves slow it down. It needs one more drink to grow."
+            case .happy:     "\(plant.displayName) is happy again!"
             }
         }
         celebrations += 1
@@ -348,7 +348,7 @@ struct BedView: View {
 
     private func notThirstyTip(for plant: GardenPlant) -> String {
         // Desert plants get a lesson about overwatering; everyone else a gentle note.
-        bed == .desert ? bed.notThirstyTip : "\(plant.name) has enough water right now."
+        bed == .desert ? bed.notThirstyTip : "\(plant.displayName) has enough water right now."
     }
 
     private func messageCard(_ text: String) -> some View {
@@ -443,16 +443,16 @@ struct BedView: View {
         switch kind {
         case .caterpillar:
             if plant.hasCaterpillar {
-                say("\(plant.name) already has a caterpillar.")
+                say("\(plant.displayName) already has a caterpillar.")
             } else if plant.hasLadybug(at: date) {
-                say("The ladybug is guarding \(plant.name)! Ladybugs eat tiny bug eggs, so caterpillars stay away.")
+                say("The ladybug is guarding \(plant.displayName)! Ladybugs eat tiny bug eggs, so caterpillars stay away.")
             } else {
                 withAnimation(.spring(duration: 0.4)) { plant.addCaterpillar(at: date) }
-                say("A caterpillar crawled onto \(plant.name). It's hungry for leaves!")
+                say("A caterpillar crawled onto \(plant.displayName). It's hungry for leaves!")
             }
         case .ladybug:
             if plant.hasLadybug(at: date) {
-                say("A ladybug is already guarding \(plant.name).")
+                say("A ladybug is already guarding \(plant.displayName).")
             } else {
                 withAnimation(.spring(duration: 0.4)) { plant.addLadybug(at: date) }
                 say(ladybugMessage(for: plant))
@@ -460,13 +460,13 @@ struct BedView: View {
             }
         case .bee, .butterfly:
             if !plant.makesFlowers {
-                say("\(plant.name) doesn't make flowers. Bees and butterflies visit flowers, so try a flowering plant!")
+                say("\(plant.displayName) doesn't make flowers. Bees and butterflies visit flowers, so try a flowering plant!")
             } else if !plant.hasFlowers {
-                say("\(plant.name) isn't flowering yet. Bees and butterflies visit flowers, so let it grow first!")
+                say("\(plant.displayName) isn't flowering yet. Bees and butterflies visit flowers, so let it grow first!")
             } else if let visiting = plant.pollinator(at: date) {
-                say("A \(visiting.name.lowercased()) is already sitting on \(plant.name)'s flowers.")
+                say("A \(visiting.name.lowercased()) is already sitting on \(plant.displayName)'s flowers.")
             } else if visitors.contains(where: { $0.plantID == plant.persistentModelID }) {
-                say("Something is already flying to \(plant.name).")
+                say("Something is already flying to \(plant.displayName).")
             } else {
                 sendVisitor(kind, to: plant, from: point)
             }
@@ -475,7 +475,7 @@ struct BedView: View {
     }
 
     private func ladybugMessage(for plant: GardenPlant) -> String {
-        var text = "A ladybug is guarding \(plant.name). Ladybugs eat tiny bug eggs, so new caterpillars stay away."
+        var text = "A ladybug is guarding \(plant.displayName). Ladybugs eat tiny bug eggs, so new caterpillars stay away."
         if plant.hasCaterpillar { text += " You still need to move the caterpillar that's already there." }
         return text
     }
@@ -507,9 +507,9 @@ struct BedView: View {
                 if !alreadyPollinated { plant.pollinate(at: date) }
             }
             if alreadyPollinated {
-                say("A \(visitor.kind.name.lowercased()) is resting on \(plant.name)'s flowers.")
+                say("A \(visitor.kind.name.lowercased()) is resting on \(plant.displayName)'s flowers.")
             } else {
-                var text = "A \(visitor.kind.name.lowercased()) carried pollen to \(plant.name)'s flowers! Pollen helps plants make seeds."
+                var text = "A \(visitor.kind.name.lowercased()) carried pollen to \(plant.displayName)'s flowers! Pollen helps plants make seeds."
                 if plant.pollenBoost { text += " Water it when it's thirsty for a growth boost." }
                 say(text)
             }
@@ -603,7 +603,7 @@ private struct PlotTile: View {
                 // Bugs show here; tap the plant to see them up close and drag them away.
                 PlantWithBugs(plant: plant, droopy: thirsty, size: Self.spriteSize, now: now)
                     .frame(height: 70, alignment: .bottom)
-                Text(plant.name)
+                Text(plant.displayName)
                     .font(.caption.weight(.semibold))
                     .lineLimit(1)
                 // Always laid out so the tile doesn't jump when the bar appears.
@@ -680,7 +680,7 @@ private struct PlotTile: View {
     }
 
     private var accessibilityText: String {
-        var parts = [plant.name, plant.stageName, thirsty ? "thirsty" : "happy"]
+        var parts = [plant.displayName, plant.stageName, thirsty ? "thirsty" : "happy"]
         if plant.hasCaterpillar { parts.append("a caterpillar is chewing its leaves") }
         else if plant.leafHoles > 0 { parts.append("chewed leaves") }
         if plant.hasLadybug(at: now) { parts.append("guarded by a ladybug") }

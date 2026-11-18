@@ -105,7 +105,7 @@ private struct PlotPicker: View {
         VStack(spacing: 2) {
             PlantSprite(plant: plant, size: 60, holes: plant.leafHoles)
                 .frame(height: 70, alignment: .bottom)
-            Text(plant.name)
+            Text(plant.displayName)
                 .font(.caption.weight(.semibold))
                 .lineLimit(1)
         }
@@ -116,7 +116,7 @@ private struct PlotPicker: View {
         .background(bed.wetSoil, in: RoundedRectangle(cornerRadius: 16))
         .opacity(0.55)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(plant.name) already grows here")
+        .accessibilityLabel("\(plant.displayName) already grows here")
     }
 
     private func openPlot(_ index: Int) -> some View {

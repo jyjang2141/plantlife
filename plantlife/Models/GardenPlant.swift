@@ -151,7 +151,10 @@ final class GardenPlant {
     /// 60 * 60 * 12 for twice a day.
     static let baseThirstInterval: TimeInterval = 60 * 60 * 12
 
+    /// The plant's common name from the Journal ("Sunflower"). Also links it back to its Journal page.
     var name: String
+    /// A name the kid gave their plant ("Sunny"). "" = no nickname yet.
+    var nickname: String = ""
     /// The `PlantSpecies` raw value (named before the icon database existed).
     var kindRaw: String
     var plotRaw: String = ""
@@ -205,6 +208,15 @@ final class GardenPlant {
     }
 
     var species: PlantSpecies { PlantSpecies(rawValue: kindRaw) ?? .other }
+
+    /// The kid's nickname if they gave one, otherwise the plant's common name.
+    var displayName: String {
+        let trimmed = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? name : trimmed
+    }
+
+    /// True when the plant has a nickname, so screens can also show what kind of plant it is.
+    var hasNickname: Bool { displayName != name }
 
     /// Plants saved before beds existed fall back to a bed based on their species.
     var plot: GardenPlot { GardenPlot(rawValue: plotRaw) ?? .from(species: species, info: nil) }

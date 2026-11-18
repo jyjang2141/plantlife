@@ -26,6 +26,8 @@ struct GardenPlantDetailView: View {
     @State private var canPoint: CGPoint?
     @State private var isWatering = false
     @State private var wateringProgress = 0.0
+    @State private var renaming = false
+    @State private var newName = ""
 
     /// The journal page saved at the same moment this plant was planted.
     private var journalEntry: JournalEntry? {
@@ -53,7 +55,7 @@ struct GardenPlantDetailView: View {
                 .scrollDisabled(draggingBug || canPoint != nil)
             }
             .background(Theme.background)
-            .navigationTitle(plant.name)
+            .navigationTitle(plant.displayName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -94,7 +96,15 @@ struct GardenPlantDetailView: View {
                     }
                 }
             }
-            .confirmationDialog("Remove \(plant.name) from your garden?",
+            .alert("Name your plant", isPresented: $renaming) {
+                TextField(plant.name, text: $newName)
+                    .textInputAutocapitalization(.words)
+                Button("Save") { rename() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Give your \(plant.name.lowercased()) a name. Leave it empty to call it \(plant.name).")
+            }
+            .confirmationDialog("Remove \(plant.displayName) from your garden?",
                                 isPresented: $confirmRemove, titleVisibility: .visible) {
                 Button("Remove", role: .destructive) { onRemove() }
             } message: {
@@ -128,6 +138,8 @@ struct GardenPlantDetailView: View {
                     .foregroundStyle(.secondary)
             }
 
+            nameTag
+
             Label("Lives in the \(plant.plot.title)", systemImage: plant.plot.symbol)
                 .font(.headline)
 
@@ -142,6 +154,32 @@ struct GardenPlantDetailView: View {
                     .foregroundStyle(.blue)
             }
         }
+    }
+
+    /// The plant's name. Tap it to give the plant a nickname.
+    private var nameTag: some View {
+        Button {
+            newName = plant.nickname
+            renaming = true
+        } label: {
+            VStack(spacing: 2) {
+                Label(plant.displayName, systemImage: "pencil")
+                    .labelStyle(NameTagLabelStyle())
+                    .font(.system(.title2, design: .rounded).bold())
+                if plant.hasNickname {
+                    Text("a \(plant.name.lowercased())")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(plant.displayName). Change name")
+    }
+
+    private func rename() {
+        plant.nickname = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        try? context.save()
     }
 
     private func plantCare(now: Date, thirsty: Bool) -> some View {
@@ -226,7 +264,7 @@ struct GardenPlantDetailView: View {
 
     private func closeupDescription(now: Date) -> String {
         let bugs = plant.bugs(at: now).map { "a " + $0.name.lowercased() }
-        var text = "\(plant.name), \(plant.stageName)"
+        var text = "\(plant.displayName), \(plant.stageName)"
         if plant.leafHoles > 0 { text += ", with chewed, wilted leaves" }
         text += bugs.isEmpty ? ". No bugs on it." : ". On it: " + bugs.joined(separator: ", ") + "."
         return text
@@ -298,7 +336,7 @@ struct GardenPlantDetailView: View {
     }
 
     private var growthHint: String {
-        if plant.growth >= plant.maxGrowth { return "\(plant.name) is fully grown! Keep watering to keep it happy." }
+        if plant.growth >= plant.maxGrowth { return "\(plant.displayName) is fully grown! Keep watering to keep it happy." }
         if plant.leafHoles > 0 {
             return plant.halfGrown
                 ? "Halfway to the next stage! Chewed leaves mean it needs 2 drinks to grow."
@@ -432,5 +470,18 @@ struct GardenPlantDetailView: View {
         .padding(18)
         .background(Theme.card)
         .clipShape(Theme.cardShape)
+    }
+}
+
+
+/// Name first, then a small pencil, so kids can see the name can be changed.
+private struct NameTagLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 6) {
+            configuration.title
+            configuration.icon
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
     }
 }

@@ -7,11 +7,17 @@ struct GardenView: View {
     @Query(sort: \GardenPlant.datePlanted) private var plants: [GardenPlant]
     @State private var now = Date.now
     @State private var selectedPlant: GardenPlant?
+    /// The name the kid gave their garden. Saved on the device.
+    @AppStorage("gardenName") private var gardenName = ""
+    @State private var renamingGarden = false
+    @State private var newGardenName = ""
     /// Which clearing is centered. Owned by `PlantLifeHome` so other screens can send the kid to a bed.
     @Binding var currentArea: Int?
 
     static let areas: [GardenPlot] = [.desert, .sunny, .shady]
     private var areas: [GardenPlot] { Self.areas }
+
+    private var displayGardenName: String { gardenName.isEmpty ? "My little garden" : gardenName }
 
     var body: some View {
         GeometryReader { geometry in
@@ -43,7 +49,17 @@ struct GardenView: View {
                 VStack {
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("My little garden").font(.system(.title2, design: .rounded).bold())
+                            Button {
+                                newGardenName = gardenName
+                                renamingGarden = true
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Text(displayGardenName).font(.system(.title2, design: .rounded).bold())
+                                    Image(systemName: "pencil").font(.subheadline).opacity(0.6)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("\(displayGardenName). Change garden name")
                             Label("Drag to explore", systemImage: "hand.draw")
                                 .font(.subheadline)
                         }
@@ -100,6 +116,14 @@ struct GardenView: View {
                 do { try await Task.sleep(for: .seconds(5)) }
                 catch { break }
             }
+        }
+        .alert("Name your garden", isPresented: $renamingGarden) {
+            TextField("My little garden", text: $newGardenName)
+                .textInputAutocapitalization(.words)
+            Button("Save") { gardenName = newGardenName.trimmingCharacters(in: .whitespacesAndNewlines) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("What should your garden be called?")
         }
         .fullScreenCover(item: $selectedPlant) { plant in
             GardenPlantDetailView(plant: plant) {
@@ -185,7 +209,7 @@ private struct GardenClearing: View {
                                 .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
-                                .accessibilityLabel("Care for " + plant.name)
+                                .accessibilityLabel("Care for " + plant.displayName)
                             } else {
                                 Button(action: findPlant) {
                                 Ellipse().fill(.black.opacity(0.13))
