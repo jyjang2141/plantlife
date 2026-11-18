@@ -29,9 +29,17 @@ enum PlantRecorder {
     }
 
     /// Puts a Journal plant into one plot of a garden bed, just watered.
-    @MainActor
-    static func plant(_ entry: JournalEntry, in bed: GardenPlot, slot: Int, context: ModelContext) {
-        guard !entry.plantedInGarden else { return }
+    @MainActor @discardableResult
+    static func plant(_ entry: JournalEntry, in bed: GardenPlot, slot: Int, position: CGPoint? = nil,
+                      placementSize: CGSize? = nil, context: ModelContext) -> Bool {
+        guard !entry.plantedInGarden else { return false }
+        guard let existing = try? context.fetch(FetchDescriptor<GardenPlant>()) else { return false }
+        let residents = existing.filter { $0.plot == bed }
+        guard residents.count < GardenPlot.plotCount else { return false }
+        if let position {
+            guard GardenLayout.isAllowed(position, bed: bed, occupied: GardenLayout.positions(residents),
+                                         size: placementSize ?? GardenLayout.referenceSize) else { return false }
+        }
         let info = entry.info
         let plant = GardenPlant(name: entry.name,
                                 species: info.map(PlantSpecies.match) ?? .other,
@@ -41,9 +49,18 @@ enum PlantRecorder {
                                 canFlower: info?.flowers ?? false)
         // The planting activity ends with a drink, so it starts out happy (still a seedling).
         plant.lastWatered = .now
+        if let position {
+            plant.gardenX = position.x
+            plant.gardenY = position.y
+        }
         plant.timesWatered = 1
         context.insert(plant)
         entry.plantedInGarden = true
-        try? context.save()
+        do { try context.save(); return true }
+        catch {
+            context.delete(plant)
+            entry.plantedInGarden = false
+            return false
+        }
     }
 }
