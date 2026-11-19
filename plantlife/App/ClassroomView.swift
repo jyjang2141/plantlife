@@ -256,7 +256,7 @@ struct NewEntrySheet: View {
     @EnvironmentObject private var classService: ClassService
     @Environment(\.dismiss) private var dismiss
 
-    @AppStorage("lastPlantName") private var plantName = ""
+    @State private var plantName = ""
     @State private var kind: CareEntry.Kind = .water
     @State private var note = ""
     @State private var photoItem: PhotosPickerItem?

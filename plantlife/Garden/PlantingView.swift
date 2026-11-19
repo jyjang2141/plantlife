@@ -177,7 +177,6 @@ private struct PlantingActivity: View {
             StepTracker(current: step.rawValue)
             instruction
             soil
-            Spacer(minLength: 0)
             if let hint { HintCard(text: hint) }
             tray
         }
@@ -257,7 +256,7 @@ private struct PlantingActivity: View {
 
     private var soil: some View {
         SoilPatch(bed: bed, dig: dig, seedPlaced: seedPlaced, cover: cover, water: water)
-            .frame(height: 280)
+            .frame(minHeight: 280, maxHeight: .infinity)
             .overlay {
                 if step == .done {
                     // The sprite's ground line sits on the little mound in the middle.
