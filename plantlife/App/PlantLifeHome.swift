@@ -25,6 +25,7 @@ struct PlantLifeHome: View {
                     switch selectedTab {
                     case 1: DiscoverView(selectedTab: $selectedTab, journalPath: $journalPath)
                     case 2: JournalView(selectedTab: $selectedTab, path: $journalPath)
+                    case 4: ClassroomView()
                     default: LearnView()
                     }
                 }

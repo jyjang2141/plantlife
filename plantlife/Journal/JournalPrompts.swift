@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 enum JournalPrompts {
     static let observations = [

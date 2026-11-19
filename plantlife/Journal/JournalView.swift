@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 import SwiftData
 
 // MARK: - Journal: every plant you've ever scanned

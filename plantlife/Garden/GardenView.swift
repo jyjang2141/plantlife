@@ -78,6 +78,7 @@ struct GardenView: View {
                         Menu {
                             Button("My journal", systemImage: "book") { selectedTab = 2 }
                             Button("Learn", systemImage: "sparkles") { selectedTab = 3 }
+                            Button("Classroom", systemImage: "person.3") { selectedTab = 4 }
                         } label: {
                             Image(systemName: "book").font(.title2)
                                 .frame(width: 48, height: 48).background(cream, in: Circle())

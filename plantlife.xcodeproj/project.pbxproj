@@ -6,6 +6,11 @@
 	objectVersion = 90;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		E8B10D7C30AE6E0300A75DCC /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = E8B10D7B30AE6E0300A75DCC /* FirebaseAuth */; };
+		E8B10D7E30AE6E0300A75DCC /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = E8B10D7D30AE6E0300A75DCC /* FirebaseFirestore */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* plantlife.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = plantlife.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -22,6 +27,8 @@
 		000000000000000130000000 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				E8B10D7C30AE6E0300A75DCC /* FirebaseAuth in Frameworks */,
+				E8B10D7E30AE6E0300A75DCC /* FirebaseFirestore in Frameworks */,
 			);
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -60,6 +67,10 @@
 				000000000000000000000010 /* plantlife */,
 			);
 			name = plantlife;
+			packageProductDependencies = (
+				E8B10D7B30AE6E0300A75DCC /* FirebaseAuth */,
+				E8B10D7D30AE6E0300A75DCC /* FirebaseFirestore */,
+			);
 			productName = MyApp;
 			productReference = 000000000000000000000120 /* plantlife.app */;
 			productType = "com.apple.product-type.application";
@@ -88,6 +99,9 @@
 			);
 			mainGroup = 000000000000000000000001;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				E8B10D7A30AE6E0300A75DCC /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 90;
 			productRefGroup = 000000000000000000000020 /* Products */;
 			projectDirPath = "";
@@ -345,6 +359,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		E8B10D7A30AE6E0300A75DCC /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 13.2.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		E8B10D7B30AE6E0300A75DCC /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E8B10D7A30AE6E0300A75DCC /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		E8B10D7D30AE6E0300A75DCC /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E8B10D7A30AE6E0300A75DCC /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 000000000000000000000000 /* Project object */;
 }
