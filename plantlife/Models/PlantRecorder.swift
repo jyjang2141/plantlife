@@ -37,7 +37,8 @@ enum PlantRecorder {
         let residents = existing.filter { $0.plot == bed }
         guard residents.count < GardenPlot.plotCount else { return false }
         if let position {
-            guard GardenLayout.isAllowed(position, bed: bed, occupied: GardenLayout.positions(residents),
+            guard GardenLayout.isAllowed(position, bed: bed,
+                                         occupied: GardenLayout.positions(residents, size: placementSize ?? GardenLayout.referenceSize),
                                          size: placementSize ?? GardenLayout.referenceSize) else { return false }
         }
         let info = entry.info

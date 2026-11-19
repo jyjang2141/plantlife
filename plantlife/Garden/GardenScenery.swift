@@ -62,9 +62,9 @@ struct GardenScenery: View {
                 switch bed {
                 case .sunny:
                     pond(&context, rect: GardenLayout.sceneryRect(bed, size: size), time: time, gust: gust)
-                    shrub(&context, origin: CGPoint(x: 6, y: size.height * 0.97), scale: unit * 1.35)
-                    shrub(&context, origin: CGPoint(x: size.width - 6, y: size.height * 0.98), scale: unit * 1.40)
-                    shrub(&context, origin: CGPoint(x: size.width * 0.64, y: -18), scale: unit * 0.75)
+                    for placement in GardenLayout.sunnyShrubs(in: size) {
+                        shrub(&context, origin: placement.origin, scale: placement.scale)
+                    }
                 case .shady:
                     // Shadows are ground decoration; the leaf canopy is foreground at the edges.
                     canopy(&context, size: size, shadows: true, gust: gust)
@@ -117,13 +117,7 @@ struct GardenScenery: View {
     }
 
     private func leafOutline(length: CGFloat) -> Path {
-        var path = Path()
-        path.move(to: .zero)
-        path.addQuadCurve(to: CGPoint(x: 0, y: -length),
-                          control: CGPoint(x: -length * 0.55, y: -length * 0.64))
-        path.addQuadCurve(to: .zero, control: CGPoint(x: length * 0.48, y: -length * 0.55))
-        path.closeSubpath()
-        return path
+        Path(GardenLayout.leafPath(length: length))
     }
 
     private func stone(_ context: inout GraphicsContext, x: CGFloat, y: CGFloat, size: CGFloat) {
@@ -297,12 +291,9 @@ struct GardenScenery: View {
     }
 
     private func canopy(_ context: inout GraphicsContext, size: CGSize, shadows: Bool, gust: Double) {
-        let unit = min(size.width / 750, size.height / 560) * 1.32
+        let unit = GardenLayout.canopyScale(in: size)
         var shadow = Path()
-        let clusters: [(CGFloat, CGFloat, Double)] = [
-            (-12, 38, 125), (size.width + 12, 27, -125),
-            (-18, size.height * 0.96, 48), (size.width + 20, size.height * 0.99, -48)
-        ]
+        let clusters = GardenLayout.canopyClusters(in: size)
         for (index, cluster) in clusters.enumerated() {
             var local = context
             local.translateBy(x: cluster.0 + (shadows ? 32 * unit : 0),

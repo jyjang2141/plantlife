@@ -42,7 +42,7 @@ private struct FreePlantPicker: View {
     @State private var feedback = "Touch anywhere on the green ground."
     @State private var viewportSize = GardenLayout.referenceSize
     private var full: Bool { plants.count >= GardenPlot.plotCount }
-    private var occupied: [CGPoint] { GardenLayout.positions(plants) }
+    private var occupied: [CGPoint] { GardenLayout.positions(plants, size: viewportSize) }
 
     var body: some View {
         VStack(spacing: 0) {

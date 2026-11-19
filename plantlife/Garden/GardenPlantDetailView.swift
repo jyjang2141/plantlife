@@ -38,26 +38,36 @@ struct GardenPlantDetailView: View {
 
     var body: some View {
         NavigationStack {
-            // Ticks every second so the "thirsty in…" countdown stays live.
-            TimelineView(.periodic(from: .now, by: 1)) { timeline in
-                ScrollView {
-                    VStack(spacing: 18) {
-                        header(now: timeline.date)
-                            .zIndex(1)   // a dragged bug stays on top of the cards below
-                        growthCard
-                        bugsCard(now: timeline.date)
-                        if let needs = journalEntry?.info?.needs { needsCard(needs) }
-                        statsCard
-                        actions
+            GeometryReader { viewport in
+                // Ticks every second so the "thirsty in…" countdown stays live.
+                TimelineView(.periodic(from: .now, by: 1)) { timeline in
+                    ScrollView {
+                        VStack(spacing: 18) {
+                            header(now: timeline.date, careHeight: viewport.size.height * 0.73)
+                                .zIndex(1)   // a dragged bug stays on top of the cards below
+                            growthCard
+                            bugsCard(now: timeline.date)
+                            if let needs = journalEntry?.info?.needs { needsCard(needs) }
+                            statsCard
+                            actions
+                        }
+                        .padding(20)
                     }
-                    .padding(20)
+                    .scrollDisabled(draggingBug || canPoint != nil)
                 }
-                .scrollDisabled(draggingBug || canPoint != nil)
             }
             .background(Theme.background)
-            .navigationTitle(plant.displayName)
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Image(systemName: plant.plot.symbol)
+                        .foregroundStyle(plant.plot.tint)
+                        .accessibilityLabel("Garden: " + plant.plot.title)
+                }
+                ToolbarItem(placement: .principal) {
+                    nameTag
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
@@ -111,17 +121,17 @@ struct GardenPlantDetailView: View {
                 Text("It will stay in your Journal.")
             }
         }
-        .presentationDetents([.medium, .large], selection: $detent)
+        .presentationDetents([.large], selection: $detent)
         .presentationDragIndicator(.visible)
-        .interactiveDismissDisabled(draggingBug)
+        .interactiveDismissDisabled(draggingBug || canPoint != nil)
     }
 
     // MARK: Pieces
 
-    private func header(now: Date) -> some View {
+    private func header(now: Date, careHeight: CGFloat) -> some View {
         let thirsty = plant.isThirsty(at: now)
         return VStack(spacing: 10) {
-            plantCare(now: now, thirsty: thirsty)
+            plantCare(now: now, thirsty: thirsty, height: careHeight)
 
             if let notice {
                 Label(notice, systemImage: "checkmark.circle.fill")
@@ -137,11 +147,6 @@ struct GardenPlantDetailView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
-
-            nameTag
-
-            Label("Lives in the \(plant.plot.title)", systemImage: plant.plot.symbol)
-                .font(.headline)
 
             if thirsty {
                 Label("Thirsty! Drag the watering can onto your plant.", systemImage: "drop")
@@ -162,14 +167,18 @@ struct GardenPlantDetailView: View {
             newName = plant.nickname
             renaming = true
         } label: {
-            VStack(spacing: 2) {
+            VStack(spacing: 1) {
                 Label(plant.displayName, systemImage: "pencil")
                     .labelStyle(NameTagLabelStyle())
-                    .font(.system(.title2, design: .rounded).bold())
+                    .font(.system(.headline, design: .rounded).bold())
+                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
                 if plant.hasNickname {
-                    Text("a \(plant.name.lowercased())")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    Text(plant.name)
+                        .font(.caption.italic())
+                        .foregroundStyle(.gray)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 }
             }
         }
@@ -182,13 +191,13 @@ struct GardenPlantDetailView: View {
         try? context.save()
     }
 
-    private func plantCare(now: Date, thirsty: Bool) -> some View {
+    private func plantCare(now: Date, thirsty: Bool, height: CGFloat) -> some View {
         VStack(spacing: 8) {
             GeometryReader { geometry in
                 ZStack(alignment: .top) {
-                    closeup(now: now, thirsty: thirsty)
+                    closeup(now: now, thirsty: thirsty, size: geometry.size)
                     if thirsty {
-                        let point = canPoint ?? CGPoint(x: geometry.size.width * 0.82, y: 279)
+                        let point = canPoint ?? CGPoint(x: geometry.size.width * 0.84, y: geometry.size.height * 0.88)
                         WateringCan()
                             .frame(width: 66, height: 66)
                             .overlay(alignment: .topLeading) {
@@ -201,8 +210,10 @@ struct GardenPlantDetailView: View {
                                 DragGesture(coordinateSpace: .named("plantCare"))
                                     .onChanged { value in
                                         canPoint = value.location
-                                        let target = CGRect(x: geometry.size.width * 0.15, y: 20,
-                                                            width: geometry.size.width * 0.7, height: 216)
+                                        let target = CGRect(x: geometry.size.width * 0.08,
+                                                            y: geometry.size.height * 0.08,
+                                                            width: geometry.size.width * 0.84,
+                                                            height: geometry.size.height * 0.70)
                                         isWatering = target.contains(value.location)
                                     }
                                     .onEnded { _ in
@@ -218,7 +229,7 @@ struct GardenPlantDetailView: View {
                 }
                 .coordinateSpace(name: "plantCare")
             }
-            .frame(height: thirsty ? 320 : 236)
+            .frame(height: height)
             if thirsty {
                 ProgressView(value: wateringProgress).tint(Theme.water)
                 Button("Water my plant") {
@@ -235,12 +246,21 @@ struct GardenPlantDetailView: View {
     }
 
     /// The plant up close, standing in its soil, with its bugs on it. Kids drag bugs off to move them away.
-    private func closeup(now: Date, thirsty: Bool) -> some View {
-        PlantWithBugs(plant: plant, droopy: thirsty, size: 220, now: now,
+    private func closeup(now: Date, thirsty: Bool, size: CGSize) -> some View {
+        let spriteSize = min(size.width * 0.86, size.height * 0.68)
+        // Icon drawings meet the ground at y = 74 in an 80-point canvas,
+        // leaving transparent space beneath the roots. Compensate for that
+        // space, including the same wilt transforms used by PlantSprite.
+        let lean = PlantSprite.lean(droopy: thirsty, holes: plant.leafHoles) * .pi / 180
+        let groundInset = spriteSize * (6.0 / 80.0) *
+            PlantSprite.squash(holes: plant.leafHoles) * cos(lean)
+        return PlantWithBugs(plant: plant, droopy: thirsty, size: spriteSize, now: now,
                       onDragOff: { kind in draggedOff(kind) },
                       onDragging: { draggingBug = $0 })
+            .offset(y: groundInset)
             .frame(maxWidth: .infinity)
-            .frame(height: 236, alignment: .bottom)
+            .frame(height: size.height * 0.78, alignment: .bottom)
+            .frame(height: size.height, alignment: .top)
             // Only the background is clipped, so a bug can be dragged out past the edge.
             .background {
                 ZStack(alignment: .bottom) {
@@ -248,7 +268,7 @@ struct GardenPlantDetailView: View {
                                    startPoint: .top, endPoint: .bottom)
                     Rectangle()
                         .fill(thirsty ? plant.plot.drySoil : plant.plot.wetSoil)
-                        .frame(height: 34)
+                        .frame(height: size.height * 0.22)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 24))
             }

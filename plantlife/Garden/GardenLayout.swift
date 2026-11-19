@@ -24,6 +24,7 @@ enum GardenLayout {
         path.addRect(CGRect(x: 0, y: size.height - margin, width: size.width, height: margin))
         path.addRect(CGRect(x: 0, y: 0, width: margin, height: size.height))
         path.addRect(CGRect(x: size.width - margin, y: 0, width: margin, height: size.height))
+        path.addPath(decorationPath(bed: bed, size: size))
 
         // Follow each illustration's actual silhouette rather than its old layout box.
         let scenery = sceneryRect(bed, size: size).insetBy(dx: -7, dy: -7)
@@ -39,6 +40,77 @@ enum GardenLayout {
                                    y: point.y * size.height - sprite * 0.85 - 6,
                                    width: sprite * 0.80 + 12, height: sprite * 0.95 + 12)
             path.addEllipse(in: footprint)
+        }
+        return path
+    }
+
+    static func sunnyShrubs(in size: CGSize) -> [(origin: CGPoint, scale: CGFloat)] {
+        let unit = min(size.width / 750, size.height / 560)
+        return [
+            (CGPoint(x: 6, y: size.height * 0.97), unit * 1.35),
+            (CGPoint(x: size.width - 6, y: size.height * 0.98), unit * 1.40),
+            (CGPoint(x: size.width * 0.64, y: -18), unit * 0.75)
+        ]
+    }
+
+    static func canopyScale(in size: CGSize) -> CGFloat {
+        min(size.width / 750, size.height / 560) * 1.32
+    }
+
+    static func canopyClusters(in size: CGSize) -> [(CGFloat, CGFloat, Double)] {
+        [(-12, 38, 125), (size.width + 12, 27, -125),
+         (-18, size.height * 0.96, 48), (size.width + 20, size.height * 0.99, -48)]
+    }
+
+    static func leafPath(length: CGFloat) -> CGPath {
+        let path = CGMutablePath()
+        path.move(to: .zero)
+        path.addQuadCurve(to: CGPoint(x: 0, y: -length),
+                          control: CGPoint(x: -length * 0.55, y: -length * 0.64))
+        path.addQuadCurve(to: .zero, control: CGPoint(x: length * 0.48, y: -length * 0.55))
+        path.closeSubpath()
+        return path
+    }
+
+    /// Generous rounded zones around each corner group, rather than individual leaf outlines.
+    static func decorationPath(bed: GardenPlot, size: CGSize) -> CGPath {
+        let path = CGMutablePath()
+        let padding = max(14, min(size.width, size.height) * 0.02)
+        if bed == .sunny {
+            for shrub in sunnyShrubs(in: size).prefix(2) {
+                let group = CGMutablePath()
+                let transform = CGAffineTransform(translationX: shrub.origin.x, y: shrub.origin.y)
+                    .scaledBy(x: shrub.scale, y: shrub.scale)
+                for index in 0..<5 {
+                    group.addEllipse(in: CGRect(x: CGFloat(index - 2) * 25 - 31,
+                        y: -38 - CGFloat(2 - abs(index - 2)) * 17, width: 62, height: 62), transform: transform)
+                }
+                for index in 0..<7 {
+                    group.addEllipse(in: CGRect(x: CGFloat(index - 3) * 20 - 27,
+                        y: -CGFloat(3 - abs(index - 3)) * 14 - 30, width: 54, height: 54), transform: transform)
+                }
+                path.addRoundedRect(in: group.boundingBoxOfPath.insetBy(dx: -padding, dy: -padding),
+                                    cornerWidth: 24, cornerHeight: 24)
+            }
+        } else if bed == .shady {
+            let scale = canopyScale(in: size)
+            for (index, cluster) in canopyClusters(in: size).enumerated() {
+                let group = CGMutablePath()
+                // Include the small sweep of the leaves during a breeze.
+                for sway in [0.0, 1.0, 2.0] {
+                    for blade in 0..<10 {
+                        let length = CGFloat(80 + (blade * 19 + index * 13) % 51)
+                        let angle = cluster.2 + Double(blade - 5) * 13 + sway
+                        let transform = CGAffineTransform(translationX: cluster.0, y: cluster.1)
+                            .scaledBy(x: scale, y: scale)
+                            .translatedBy(x: CGFloat(blade % 3 * 8), y: CGFloat(blade % 2 * 9))
+                            .rotated(by: angle * .pi / 180)
+                        group.addPath(leafPath(length: length), transform: transform)
+                    }
+                }
+                path.addRoundedRect(in: group.boundingBoxOfPath.insetBy(dx: -padding, dy: -padding),
+                                    cornerWidth: 24, cornerHeight: 24)
+            }
         }
         return path
     }
@@ -59,7 +131,7 @@ enum GardenLayout {
         return CGRect(x: box.midX - width / 2, y: box.midY - height / 2, width: width, height: height)
     }
 
-    static func positions(_ plants: [GardenPlant]) -> [CGPoint] {
+    static func positions(_ plants: [GardenPlant], size: CGSize = referenceSize) -> [CGPoint] {
         var result = [CGPoint]()
         let saved = plants.filter { $0.gardenX >= 0 && $0.gardenY >= 0 }
             .map { CGPoint(x: $0.gardenX, y: $0.gardenY) }
@@ -71,10 +143,21 @@ enum GardenLayout {
                 let candidates = fallbackPoints
                 let start = max(0, plant.slot) % candidates.count
                 let ordered = Array(candidates[start...] + candidates[..<start])
-                result.append(ordered.first { point in
-                    !(result + saved).contains { overlaps(point, $0) } &&
-                    isAllowed(point, bed: plant.plot, occupied: [])
-                } ?? candidates[result.count % candidates.count])
+                let occupied = result + saved
+                let fits: (CGPoint) -> Bool = { point in
+                    !occupied.contains { overlaps(point, $0) } &&
+                    isAllowed(point, bed: plant.plot, occupied: occupied, size: size)
+                }
+                // Broader corner zones may cover a legacy default. Find another open
+                // location rather than placing multiple older plants on the same spot.
+                let alternatives = (0..<25).flatMap { row in
+                    (0..<25).map { column in
+                        CGPoint(x: 0.06 + Double(column) * 0.036,
+                                y: 0.18 + Double(row) * 0.029)
+                    }
+                }
+                result.append(ordered.first(where: fits) ?? alternatives.first(where: fits)
+                              ?? candidates[result.count % candidates.count])
             }
         }
         return result
@@ -113,7 +196,7 @@ struct GardenGround: View {
     var body: some View {
         GeometryReader { geometry in
             let size = geometry.size
-            let positions = GardenLayout.positions(plants)
+            let positions = GardenLayout.positions(plants, size: size)
             ZStack {
                 GardenScenery(bed: bed, active: active)
                 if placement {

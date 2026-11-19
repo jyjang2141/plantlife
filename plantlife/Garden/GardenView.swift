@@ -64,7 +64,7 @@ struct GardenView: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel(displayGardenName + ". Change garden name")
-                            Text(area == .desert ? "Desert" : area == .sunny ? "Sunny Garden" : "Shady Garden")
+                            Text(area == .desert ? "Desert" : area == .sunny ? "Sunny Garden" : area.title)
                                 .font(.system(.headline, design: .rounded).bold())
                                 .lineLimit(1).minimumScaleFactor(0.75)
                         }
