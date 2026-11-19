@@ -19,7 +19,12 @@ struct LearnView: View {
                 }
                 Section("Remember") { Text("Every plant is different. Look for clues about what yours needs!").font(.title3) }
             }
+            .scrollContentBackground(.hidden)
+            .contentMargins(.top, 4, for: .scrollContent)
+            .listSectionSpacing(.compact)
+            .background(Theme.background)
             .navigationTitle("Plant Power")
+            .toolbarTitleDisplayMode(.inlineLarge)
         }
     }
 }

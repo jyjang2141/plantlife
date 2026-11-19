@@ -14,7 +14,12 @@ struct ClassroomView: View {
                     ClassFeedView()
                 }
             }
+            .scrollContentBackground(.hidden)
+            .contentMargins(.top, 4, for: .scrollContent)
+            .listSectionSpacing(.compact)
+            .background(Theme.background)
             .navigationTitle(classService.className ?? "Classroom")
+            .toolbarTitleDisplayMode(.inlineLarge)
         }
     }
 }
@@ -173,14 +178,8 @@ struct ClassFeedView: View {
             }
 
             Section("Class timeline") {
-                Button {
-                    showingNewEntry = true
-                } label: {
-                    Label("Share a plant update", systemImage: "plus.circle.fill")
-                        .font(.headline)
-                }
                 if classService.entries.isEmpty {
-                    Text("No posts yet. Be the first to share what you did for your plant.")
+                    Text("No posts yet. Tap + to share what you did for your plant.")
                         .foregroundStyle(.secondary)
                 }
                 ForEach(classService.entries) { entry in
@@ -192,12 +191,6 @@ struct ClassFeedView: View {
                 Section {
                     Label(error, systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.red)
-                }
-            }
-
-            Section {
-                Button("Leave class", role: .destructive) {
-                    Task { await classService.leaveClass() }
                 }
             }
         }
@@ -303,6 +296,8 @@ struct NewEntrySheet: View {
                     Text(errorText).foregroundStyle(.red)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Theme.background)
             .navigationTitle("New post")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

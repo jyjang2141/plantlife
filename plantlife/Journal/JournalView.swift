@@ -14,11 +14,12 @@ import SwiftData
 struct JournalView: View {
     @Binding var selectedTab: Int
     @Binding var path: [JournalEntry]
+    /// Toggled by the heart in PlantLifeHome's top strip.
+    @Binding var favoritesOnly: Bool
 
     @Environment(\.modelContext) private var context
     @Query(sort: \JournalEntry.dateFound, order: .reverse) private var entries: [JournalEntry]
     @State private var searchText = ""
-    @State private var favoritesOnly = false
     @State private var showComparison = false
 
     private var filtered: [JournalEntry] {
@@ -64,6 +65,10 @@ struct JournalView: View {
                             Text(entries.count == 1 ? "You've found 1 plant" : "You've found \(entries.count) plants")
                         }
                     }
+                    .scrollContentBackground(.hidden)
+                    // Pull the list up close under the "My Journal" title.
+                    .contentMargins(.top, 4, for: .scrollContent)
+                    .listSectionSpacing(.compact)
                     .searchable(text: $searchText, prompt: "Search your plants")
                     .overlay {
                         if filtered.isEmpty {
@@ -75,18 +80,14 @@ struct JournalView: View {
                             }
                         }
                     }
-                    .toolbar {
-                        Button {
-                            withAnimation { favoritesOnly.toggle() }
-                        } label: {
-                            Image(systemName: favoritesOnly ? "heart.fill" : "heart")
-                                .foregroundStyle(favoritesOnly ? .pink : .primary)
-                        }
-                        .accessibilityLabel(favoritesOnly ? "Show all plants" : "Show favorites only")
-                    }
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Theme.background)
             .navigationTitle("My Journal")
+            // A large title inside the bar's own row, so there's no empty row above it
+            // (a hidden bar came back after returning from a plant's page).
+            .toolbarTitleDisplayMode(.inlineLarge)
             .navigationDestination(for: JournalEntry.self) { entry in
                 JournalEntryDetailView(entry: entry)
             }
